@@ -5,5 +5,8 @@
 /* 定义地图块的总数 */
 #define MAP_BLOCK_TOTAL		7
 
+/* 载入红色边框 */
+int load_red_border ( LCUI_Graph *buff );
+
 /* 载入内置地图块资源 */
 int load_res_map ( LCUI_Graph *buff );

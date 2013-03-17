@@ -5,20 +5,23 @@
 #include "res_map.h"
 #include "mapbox.h"
 
-// µØÍ¼¿é
+// åœ°å›¾å—
 typedef struct _map_blocks_data {
-	int id;			// µØÍ¼¿éID
-	MAP_STYLE style;	// µØÍ¼¿éµÄÑùÊ½
+	int id;			// åœ°å›¾å—ID
+	MAP_STYLE style;	// åœ°å›¾å—çš„æ ·å¼
 } map_blocks_data;
 
 typedef struct _MapBox_Data {
-	int rows, cols;			// ¼ÇÂ¼µØÍ¼ĞĞÊıÓëÁĞÊı
-	LCUI_Pos selected;		// ±»Ñ¡ÖĞµÄµØÍ¼¿éËùÔÚµÄ×ø±ê
-	map_blocks_data **block;	// µØÍ¼¿éÊı¾İ
-	LCUI_Graph map_res;		// µØÍ¼×ÊÔ´
+	int rows, cols;				// è®°å½•åœ°å›¾è¡Œæ•°ä¸åˆ—æ•°j
+	LCUI_Pos selected;			// è¢«é€‰ä¸­çš„åœ°å›¾å—æ‰€åœ¨çš„åæ ‡
+	LCUI_Pos higlight;			// è¢«é¼ æ ‡æ¸¸æ ‡è¦†ç›–çš„åœ°å›¾å—æ‰€åœ¨çš„åæ ‡
+	int current_mapblock_id;		// å½“å‰ä½¿ç”¨çš„åœ°å›¾å—ID
+	map_blocks_data **blocks;		// åœ°å›¾å—æ•°æ®
+	LCUI_Graph map_blocks[MAP_BLOCK_TOTAL];	// å·²è®°å½•çš„åœ°å›¾å—
+	LCUI_Graph map_res;			// åœ°å›¾èµ„æº
 } MapBox_Data ;
 
-/* ¼ÆËãµØÍ¼³ß´ç */
+/* è®¡ç®—åœ°å›¾å°ºå¯¸ */
 LCUI_Size MapBox_CountSize( LCUI_Widget *widget )
 {
 	LCUI_Size size;
@@ -31,7 +34,7 @@ LCUI_Size MapBox_CountSize( LCUI_Widget *widget )
 	return size;
 }
 
-/* »ñÈ¡Ö¸¶¨ĞĞÖ¸¶¨ÁĞµÄµØÍ¼¿éµÄÏñËØ×ø±ê */
+/* è·å–æŒ‡å®šè¡ŒæŒ‡å®šåˆ—çš„åœ°å›¾å—çš„åƒç´ åæ ‡ */
 LCUI_Pos MapBox_MapBlock_GetPixelPos( LCUI_Widget *widget, int row, int col )
 {
 	double x, y;
@@ -41,7 +44,7 @@ LCUI_Pos MapBox_MapBlock_GetPixelPos( LCUI_Widget *widget, int row, int col )
 
 	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
 	map_size = MapBox_CountSize( widget );
-	/* ¼ÆËãÏñËØ×ø±ê£¬ºÍMapBox_ExecDrawº¯ÊıÖĞµÄ¼ÆËã·½·¨»ù±¾Ò»Ñù */
+	/* è®¡ç®—åƒç´ åæ ‡ï¼Œå’ŒMapBox_ExecDrawå‡½æ•°ä¸­çš„è®¡ç®—æ–¹æ³•åŸºæœ¬ä¸€æ · */
 	x = map_size.w/2.0 - MAP_BLOCK_WIDTH/2.0;
 	x -= (MAP_BLOCK_WIDTH*row/2.0);
 	y = (MAP_BLOCK_HEIGHT*row/2.0);
@@ -52,7 +55,7 @@ LCUI_Pos MapBox_MapBlock_GetPixelPos( LCUI_Widget *widget, int row, int col )
 	return pixel_pos;
 }
 
-/* »ñÈ¡Ö¸¶¨ÏñËØ×ø±êÉÏµÄµØÍ¼¿éµÄ×ø±ê */
+/* è·å–æŒ‡å®šåƒç´ åæ ‡ä¸Šçš„åœ°å›¾å—çš„åæ ‡ */
 LCUI_Pos MapBox_MapBlock_GetPos( LCUI_Widget *widget, LCUI_Pos pixel_pos )
 {
 	int i, j;
@@ -73,7 +76,7 @@ LCUI_Pos MapBox_MapBlock_GetPos( LCUI_Widget *widget, LCUI_Pos pixel_pos )
 			rect.y = (int)(y+0.5);
 			rect.width = MAP_BLOCK_WIDTH;
 			rect.height = MAP_BLOCK_HEIGHT;
-			/* Èç¹û¸ÃÏñËØµãÔÚµ±Ç°µØÍ¼¿éµÄ·¶Î§ÄÚ */
+			/* å¦‚æœè¯¥åƒç´ ç‚¹åœ¨å½“å‰åœ°å›¾å—çš„èŒƒå›´å†… */
 			if( LCUIRect_IncludePoint( pixel_pos, rect ) ) {
 				return Pos(j, i);
 			}
@@ -86,19 +89,57 @@ LCUI_Pos MapBox_MapBlock_GetPos( LCUI_Widget *widget, LCUI_Pos pixel_pos )
 	return Pos(-1, -1);
 }
 
-static void MapBox_ExecDraw( LCUI_Widget *widget )
+/* é‡ç»˜åœ°å›¾å— */
+static int MapBox_RedrawMapBlock( LCUI_Widget *widget, int row, int col )
 {
-	int i, j, n;
+	int n;
 	LCUI_Pos pos;
 	LCUI_Rect rect;
 	MapBox_Data *mapbox;
+	LCUI_Graph *graph, border_img;
+	
+	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
+	if( row < 0 || row >= mapbox->rows
+	|| col < 0 || col >= mapbox->cols ) {
+		return -1;
+	}
+	graph = Widget_GetSelfGraph( widget );
+	n = mapbox->blocks[row][col].id;
+	pos = MapBox_MapBlock_GetPixelPos( widget, row, col );
+	Graph_Mix( graph, &mapbox->map_blocks[n], pos );
+	Graph_Init( &border_img );
+	load_red_border( &border_img );
+	/* å¦‚æœä¹‹å‰å·²ç»æœ‰åœ°å›¾å—è¢«é€‰ä¸­ï¼Œåˆ™é‡ç»˜è¯¥åœ°å›¾å— */
+	if( mapbox->selected.x == col && mapbox->selected.y == row ) {
+		Graph_FillColor( &border_img, RGB(255,255,255) );
+		Graph_Mix( graph, &border_img, pos );
+	}
+	/* å¦‚æœæœ‰éœ€è¦é«˜äº®åœ°çš„å›¾å— */
+	if( mapbox->higlight.x == col && mapbox->higlight.y == row ) {
+		Graph_Mix( graph, &border_img, pos );
+	}
+	Graph_Free( &border_img );
+	rect.x = pos.x;
+	rect.y = pos.y;
+	rect.width = MAP_BLOCK_WIDTH;
+	rect.height = MAP_BLOCK_HEIGHT;
+	/* æ ‡è®°æ— æ•ˆåŒºåŸŸï¼Œä»¥è¿›è¡Œåˆ·æ–° */
+	Widget_InvalidArea( widget, rect );
+	return 0;
+}
+
+static void MapBox_ExecDraw( LCUI_Widget *widget )
+{
+	int i, j;
+	LCUI_Pos pos;
+	LCUI_Graph *graph;
+	MapBox_Data *mapbox;
 	LCUI_Size size, map_size;
-	LCUI_Graph *graph, red_border, map_blocks[MAP_BLOCK_TOTAL];
 	double start_x, start_y, x, y;
 
 	size = Widget_GetSize( widget );
 	map_size = MapBox_CountSize( widget );
-	/* Èç¹û²¿¼ş³ß´çĞèÒªµ÷Õû */
+	/* å¦‚æœéƒ¨ä»¶å°ºå¯¸éœ€è¦è°ƒæ•´ */
 	if( size.w != map_size.w
 	|| size.h != map_size.h ) {
 		Widget_Resize( widget, map_size );
@@ -107,25 +148,18 @@ static void MapBox_ExecDraw( LCUI_Widget *widget )
 	DEBUG_MSG("map size: %d,%d\n", map_size.w, map_size.h);
 	graph = Widget_GetSelfGraph( widget );
 	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
-	rect.x = rect.y = 0;
-	rect.width = MAP_BLOCK_WIDTH;
-	rect.height = MAP_BLOCK_HEIGHT;
-	/* ÒıÓÃ³öÃ¿Ò»¸öµØÍ¼Í¼¿é */
-	for(i=0; i<MAP_BLOCK_TOTAL; ++i, rect.x+=MAP_BLOCK_WIDTH) {
-		Graph_Quote( &map_blocks[i], &mapbox->map_res, rect );
-	}
 	start_x = size.w/2.0 - MAP_BLOCK_WIDTH/2.0;
 	start_y = 0;
 	DEBUG_MSG("rows: %d, cols: %d\n", mapbox->rows, mapbox->cols);
-	/* ¸ù¾İµØÍ¼Êı¾İ½øĞĞ»æÍ¼ */
+	/* æ ¹æ®åœ°å›¾æ•°æ®è¿›è¡Œç»˜å›¾ */
 	for( i=0; i<mapbox->rows; ++i ) {
 		x = start_x;
 		y = start_y;
 		for( j=0; j<mapbox->cols; ++j ) {
 			pos.x = (int)(x+0.5);
 			pos.y = (int)(y+0.5);
-			Graph_Mix( graph, &map_blocks[
-				mapbox->block[i][j].id],
+			Graph_Mix( graph, &mapbox->map_blocks[
+				mapbox->blocks[i][j].id],
 				pos );
 			x += (MAP_BLOCK_WIDTH/2.0);
 			y += (MAP_BLOCK_HEIGHT/2.0);
@@ -133,27 +167,11 @@ static void MapBox_ExecDraw( LCUI_Widget *widget )
 		start_x -= (MAP_BLOCK_WIDTH/2.0);
 		start_y += (MAP_BLOCK_HEIGHT/2.0);
 	}
-	/* Èç¹ûÖ®Ç°ÒÑ¾­ÓĞµØÍ¼¿é±»Ñ¡ÖĞ£¬ÔòÖØ»æ¸ÃµØÍ¼¿é */
-	if( mapbox->selected.x != -1 && mapbox->selected.y != -1 ) {
-		j = mapbox->selected.y;
-		i = mapbox->selected.x;
-		/* »ñÈ¡µØÍ¼¿éµÄÏñËØ×ø±ê */
-		pos = MapBox_MapBlock_GetPixelPos( widget, j, i );
-		n = mapbox->block[j][i].id;
-		Graph_Init( &red_border );
-		/* ÔØÈëºìÉ«±ß¿ò */
-		load_red_border( &red_border );
-		Graph_Mix( graph, &map_blocks[n], pos );
-		Graph_Mix( graph, &red_border, pos );
-		Graph_Free( &red_border );
-		rect.x = pos.x;
-		rect.y = pos.y;
-		/* ±ê¼ÇÎŞĞ§ÇøÓò£¬ÒÔ½øĞĞË¢ĞÂ */
-		Widget_InvalidArea( widget, rect );
-	}
+	MapBox_RedrawMapBlock( widget, mapbox->selected.y, mapbox->selected.x );
+	MapBox_RedrawMapBlock( widget, mapbox->higlight.y, mapbox->higlight.x );
 }
 
-/* ´´½¨µØÍ¼ */
+/* åˆ›å»ºåœ°å›¾ */
 int MapBox_CreateMap( LCUI_Widget *widget, int rows, int cols )
 {
 	int i, j;
@@ -162,47 +180,47 @@ int MapBox_CreateMap( LCUI_Widget *widget, int rows, int cols )
 	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
 	mapbox->rows = rows;
 	mapbox->cols = cols;
-	mapbox->block = (map_blocks_data**)malloc( 
+	mapbox->blocks = (map_blocks_data**)malloc( 
 					rows*sizeof(map_blocks_data*) );
-	if( !mapbox->block ) {
+	if( !mapbox->blocks ) {
 		return -1;
 	}
 	for(i=0; i<rows; ++i) {
-		mapbox->block[i] = (map_blocks_data*)malloc(
+		mapbox->blocks[i] = (map_blocks_data*)malloc(
 					cols*sizeof(map_blocks_data) );
-		if( !mapbox->block[i] ) {
+		if( !mapbox->blocks[i] ) {
 			return -1;
 		}
 		for(j=0; j<cols; ++j) {
-			mapbox->block[i][j].id = 0;
-			mapbox->block[i][j].style = MAP_STYLE_NORMAL;
+			mapbox->blocks[i][j].id = 0;
+			mapbox->blocks[i][j].style = MAP_STYLE_NORMAL;
 		}
 	}
 	Widget_Draw(widget);
 	return 0;
 }
 
-/* µ÷ÕûµØÍ¼³ß´ç */
+/* è°ƒæ•´åœ°å›¾å°ºå¯¸ */
 int MapBox_ResizeMap( LCUI_Widget *widget, int rows, int cols )
 {
 	int i, j;
 	MapBox_Data *mapbox;
 	
 	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
-	mapbox->block = (map_blocks_data**)realloc( 
-	mapbox->block, rows*sizeof(map_blocks_data*) );
-	if( !mapbox->block ) {
+	mapbox->blocks = (map_blocks_data**)realloc( 
+	mapbox->blocks, rows*sizeof(map_blocks_data*) );
+	if( !mapbox->blocks ) {
 		return -1;
 	}
 	for(i=0; i<rows; ++i) {
-		mapbox->block[i] = (map_blocks_data*)realloc(
-		mapbox->block[i], cols*sizeof(map_blocks_data) );
-		if( !mapbox->block[i] ) {
+		mapbox->blocks[i] = (map_blocks_data*)realloc(
+		mapbox->blocks[i], cols*sizeof(map_blocks_data) );
+		if( !mapbox->blocks[i] ) {
 			return -1;
 		}
 		for(j=0; j<cols-mapbox->cols; ++j) {
-			mapbox->block[i][j].id = 0;
-			mapbox->block[i][j].style = MAP_STYLE_NORMAL;
+			mapbox->blocks[i][j].id = 0;
+			mapbox->blocks[i][j].style = MAP_STYLE_NORMAL;
 		}
 	}
 	mapbox->rows = rows;
@@ -211,66 +229,55 @@ int MapBox_ResizeMap( LCUI_Widget *widget, int rows, int cols )
 	return 0;
 }
 
-/* Ñ¡ÖĞÒ»¸öµØÍ¼¿é */
-int MapBox_SelectMapBlock( LCUI_Widget *widget, LCUI_Pos pos )
+/* é«˜äº®ä¸€ä¸ªåœ°å›¾å— */
+int MapBox_HiglightMapBlock( LCUI_Widget *widget, LCUI_Pos pos )
 {
-	int i, n, row, col;
-	LCUI_Rect rect;
-	LCUI_Pos pixel_pos;
+	LCUI_Pos tmp_pos;
 	MapBox_Data *mapbox;
-	LCUI_Graph *graph, red_border, map_blocks[MAP_BLOCK_TOTAL];
 	
 	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
-	graph = Widget_GetSelfGraph( widget );
-	DEBUG_MSG("widget: %p, graph: %p\n", widget, graph);
-	Graph_Init( &red_border );
-	row = mapbox->selected.y;
-	col = mapbox->selected.x;
-	DEBUG_MSG("old pos: %d, %d\n", row, col);
-	rect.x = rect.y = 0;
-	rect.width = MAP_BLOCK_WIDTH;
-	rect.height = MAP_BLOCK_HEIGHT;
-	for(i=0; i<MAP_BLOCK_TOTAL; ++i, rect.x+=MAP_BLOCK_WIDTH) {
-		Graph_Quote( &map_blocks[i], &mapbox->map_res, rect );
+	if( pos.x == mapbox->higlight.x
+	&& pos.y == mapbox->higlight.y ) {
+		return 0;
 	}
+	tmp_pos = mapbox->higlight;
+	mapbox->higlight = pos;
+	/* å¦‚æœä¹‹å‰å·²ç»æœ‰åœ°å›¾å—è¢«é€‰ä¸­ï¼Œåˆ™é‡ç»˜è¯¥åœ°å›¾å— */
+	if( tmp_pos.x != -1 && tmp_pos.y != -1 ) {
+		MapBox_RedrawMapBlock( widget, tmp_pos.y, tmp_pos.x );
+	}
+	if( pos.x == -1 || pos.y  == -1 ) {
+		return -1;
+	}
+	MapBox_RedrawMapBlock( widget, pos.y, pos.x );
+	return 0;
+}
+
+/* é€‰ä¸­ä¸€ä¸ªåœ°å›¾å— */
+int MapBox_SelectMapBlock( LCUI_Widget *widget, LCUI_Pos pos )
+{
+	LCUI_Pos tmp_pos;
+	MapBox_Data *mapbox;
+	
+	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
 	if( pos.x == mapbox->selected.x
 	&& pos.y == mapbox->selected.y ) {
 		return 0;
 	}
-	/* Èç¹ûÖ®Ç°ÒÑ¾­ÓĞµØÍ¼¿é±»Ñ¡ÖĞ£¬ÔòÖØ»æ¸ÃµØÍ¼¿é */
-	if( mapbox->selected.x != -1 && mapbox->selected.y != -1 ) {
-		/* »ñÈ¡µØÍ¼¿éµÄÏñËØ×ø±ê */
-		pixel_pos = MapBox_MapBlock_GetPixelPos( widget, row, col );
-		n = mapbox->block[row][col].id;
-		Graph_Mix( graph, &map_blocks[n], pixel_pos );
-		rect.x = pixel_pos.x;
-		rect.y = pixel_pos.y;
-		/* ±ê¼ÇÎŞĞ§ÇøÓò£¬ÒÔ½øĞĞË¢ĞÂ */
-		Widget_InvalidArea( widget, rect );
-	}
+	tmp_pos = mapbox->selected;
 	mapbox->selected = pos;
+	/* å¦‚æœä¹‹å‰å·²ç»æœ‰åœ°å›¾å—è¢«é€‰ä¸­ï¼Œåˆ™é‡ç»˜è¯¥åœ°å›¾å— */
+	if( tmp_pos.x != -1 && tmp_pos.y != -1 ) {
+		MapBox_RedrawMapBlock( widget, tmp_pos.y, tmp_pos.x );
+	}
 	if( pos.x == -1 || pos.y  == -1 ) {
 		return -1;
 	}
-	row = mapbox->selected.y;
-	col = mapbox->selected.x;
-	DEBUG_MSG("current pos: %d, %d\n", row, col);
-	pixel_pos = MapBox_MapBlock_GetPixelPos( widget, row, col );
-	n = mapbox->block[row][col].id;
-	/* ÔØÈëºìÉ«±ß¿ò */
-	load_red_border( &red_border );
-	DEBUG_MSG("pixel_pos: %d,%d\n", pixel_pos.x, pixel_pos.y);
-	Graph_Mix( graph, &map_blocks[n], pixel_pos );
-	/* ½«ºìÉ«±ß¿ò»æÖÆÉÏÈ¥ */
-	Graph_Mix( graph, &red_border, pixel_pos );
-	rect.x = pixel_pos.x;
-	rect.y = pixel_pos.y;
-	Widget_InvalidArea( widget, rect );
-	Graph_Free( &red_border );
+	MapBox_RedrawMapBlock( widget, pos.y, pos.x );
 	return 0;
 }
 
-/* Éè¶¨µØÍ¼¿é */
+/* è®¾å®šåœ°å›¾å— */
 int MapBox_SetMapBlock(	LCUI_Widget	*widget,
 			LCUI_Pos	pos,
 			int		mapblock_id,
@@ -279,19 +286,19 @@ int MapBox_SetMapBlock(	LCUI_Widget	*widget,
 	return 0;
 }
 
-/* ´ÓÎÄ¼şÖĞÔØÈëµØÍ¼Êı¾İ */
+/* ä»æ–‡ä»¶ä¸­è½½å…¥åœ°å›¾æ•°æ® */
 int MapBox_LoadMapData( const char *mapdata_filepath )
 {
 	return 0;
 }
 
-/* ±£´æµØÍ¼Êı¾İÖÁÎÄ¼ş */
+/* ä¿å­˜åœ°å›¾æ•°æ®è‡³æ–‡ä»¶ */
 int MapBox_SaveMapData( const char *mapdata_filepath )
 {
 	return 0;
 }
 
-/* ´¦ÀíÊó±êÒÆ¶¯ÊÂ¼ş */
+/* å¤„ç†é¼ æ ‡ç§»åŠ¨äº‹ä»¶ */
 static void MapBox_ProcMouseMotionEvent( LCUI_MouseMotionEvent *event, void *arg )
 {
 	LCUI_Pos pos, pixel_pos;
@@ -299,19 +306,22 @@ static void MapBox_ProcMouseMotionEvent( LCUI_MouseMotionEvent *event, void *arg
 
 	widget = (LCUI_Widget*)arg;
 	pixel_pos = Widget_GetGlobalPos( widget );
-	/* ÓÃÊó±êÓÎ±êµÄ×ø±ê¼õÈ¥²¿¼şµÄÈ«¾Ö×ø±ê */
+	/* ç”¨é¼ æ ‡æ¸¸æ ‡çš„åæ ‡å‡å»éƒ¨ä»¶çš„å…¨å±€åæ ‡ */
 	pixel_pos.x = event->x - pixel_pos.x;
 	pixel_pos.y = event->y - pixel_pos.y;
 	DEBUG_MSG("cursor pixel pos: %d, %d\n", pixel_pos.x, pixel_pos.y);
 	pos = MapBox_MapBlock_GetPos( widget, pixel_pos );
 	DEBUG_MSG("mapblock pos: %d, %d\n", pos.x, pos.y);
-	/* Ñ¡ÖĞµØÍ¼¿é */
-	MapBox_SelectMapBlock( widget, pos );
+	/* é€‰ä¸­åœ°å›¾å— */
+	MapBox_HiglightMapBlock( widget, pos );
 }
 
 static void MapBox_ProcClickedEvent( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 {
+	MapBox_Data *mapbox;
 
+	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
+	MapBox_SelectMapBlock( widget, mapbox->higlight );
 }
 
 static void MapBox_ProcDragEvent( LCUI_Widget *widget, LCUI_WidgetEvent *event )
@@ -321,15 +331,28 @@ static void MapBox_ProcDragEvent( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 
 static void MapBox_ExecInit( LCUI_Widget *widget )
 {
+	int i;
+	LCUI_Rect rect;
 	MapBox_Data *mapbox;
 
 	mapbox = (MapBox_Data *)WidgetPrivData_New(widget, sizeof(MapBox_Data)); 
 	mapbox->rows = mapbox->cols = 0;
-	mapbox->selected.x = mapbox->selected.y = 0;
-	mapbox->block = NULL;
+	mapbox->selected.x = mapbox->selected.y = -1;
+	mapbox->higlight.x = mapbox->higlight.y = -1;
+	mapbox->blocks = NULL;
+	mapbox->current_mapblock_id = 0;
 	Graph_Init( &mapbox->map_res );
 	load_res_map( &mapbox->map_res );
-	/* ¹ØÁªÊó±êÒÆ¶¯ÊÂ¼ş,µã»÷ÊÂ¼ş£¬ÒÔ¼°ÍÏ¶¯ÊÂ¼ş */
+	
+	rect.x = rect.y = 0;
+	rect.width = MAP_BLOCK_WIDTH;
+	rect.height = MAP_BLOCK_HEIGHT;
+	/* å¼•ç”¨å‡ºæ¯ä¸€ä¸ªåœ°å›¾å›¾å— */
+	for(i=0; i<MAP_BLOCK_TOTAL; ++i, rect.x+=MAP_BLOCK_WIDTH) {
+		Graph_Quote( &mapbox->map_blocks[i], &mapbox->map_res, rect );
+	}
+
+	/* å…³è”é¼ æ ‡ç§»åŠ¨äº‹ä»¶,ç‚¹å‡»äº‹ä»¶ï¼Œä»¥åŠæ‹–åŠ¨äº‹ä»¶ */
 	LCUI_MouseMotionEvent_Connect( MapBox_ProcMouseMotionEvent, widget );
 	Widget_Event_Connect( widget, EVENT_CLICKED, MapBox_ProcClickedEvent );
 	Widget_Event_Connect( widget, EVENT_DRAG, MapBox_ProcDragEvent );
@@ -337,7 +360,7 @@ static void MapBox_ExecInit( LCUI_Widget *widget )
 	Widget_SetBackgroundTransparent( widget, FALSE );
 }
 
-/* ×¢²áMapBox²¿¼ş */
+/* æ³¨å†ŒMapBoxéƒ¨ä»¶ */
 void Register_MapBox(void)
 {
 	WidgetType_Add("mapbox");

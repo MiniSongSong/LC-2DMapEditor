@@ -1,12 +1,12 @@
 
-/* �����ͼ��ĳߴ� */
+/* 定义地图块的尺寸 */
 #define MAP_BLOCK_WIDTH		44
 #define MAP_BLOCK_HEIGHT	22
-/* �����ͼ������� */
+/* 定义地图块的总数 */
 #define MAP_BLOCK_TOTAL		7
 
-/* �����ɫ�߿� */
+/* 载入红色边框 */
 int load_red_border ( LCUI_Graph *buff );
 
-/* �������õ�ͼ����Դ */
+/* 载入内置地图块资源 */
 int load_res_map ( LCUI_Graph *buff );

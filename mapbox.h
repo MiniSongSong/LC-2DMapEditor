@@ -1,46 +1,49 @@
 #ifndef __MAPBOX_H__
 #define __MAPBOX_H__
-// µØÍ¼¿éÑùÊ½
+// åœ°å›¾å—æ ·å¼
 typedef enum _MAP_STYLE {
-	MAP_STYLE_NORMAL,	// Õı³£ÑùÊ½
-	MAP_STYLE_LEFT_90,	// ×óĞı×ª90¶È
-	MAP_STYLE_LEFT_180,	// ×óĞı×ª180¶È
-	MAP_STYLE_RIGHT_90,	// ÓÒĞı×ª90¶È
-	MAP_STYLE_RIGHT_180,	// ÓÒĞı×ª180¶È
-	MAP_STYLE_HORIZ,	// Ë®Æ½·­×ª
-	MAP_STYLE_VERTI		// ´¹Ö±·­×ª
+	MAP_STYLE_NORMAL,	// æ­£å¸¸æ ·å¼
+	MAP_STYLE_LEFT_90,	// å·¦æ—‹è½¬90åº¦
+	MAP_STYLE_LEFT_180,	// å·¦æ—‹è½¬180åº¦
+	MAP_STYLE_RIGHT_90,	// å³æ—‹è½¬90åº¦
+	MAP_STYLE_RIGHT_180,	// å³æ—‹è½¬180åº¦
+	MAP_STYLE_HORIZ,	// æ°´å¹³ç¿»è½¬
+	MAP_STYLE_VERTI		// å‚ç›´ç¿»è½¬
 } MAP_STYLE;
 
-/* ¼ÆËãµØÍ¼³ß´ç */
+/* è®¡ç®—åœ°å›¾å°ºå¯¸ */
 LCUI_Size MapBox_CountSize( LCUI_Widget *widget );
 
-/* »ñÈ¡Ö¸¶¨ĞĞÖ¸¶¨ÁĞµÄµØÍ¼¿éµÄÏñËØ×ø±ê */
+/* è·å–æŒ‡å®šè¡ŒæŒ‡å®šåˆ—çš„åœ°å›¾å—çš„åƒç´ åæ ‡ */
 LCUI_Pos MapBox_MapBlock_GetPixelPos( LCUI_Widget *widget, int row, int col );
 
-/* »ñÈ¡Ö¸¶¨ÏñËØ×ø±êÉÏµÄµØÍ¼¿éµÄ×ø±ê */
+/* è·å–æŒ‡å®šåƒç´ åæ ‡ä¸Šçš„åœ°å›¾å—çš„åæ ‡ */
 LCUI_Pos MapBox_MapBlock_GetPos( LCUI_Widget *widget, LCUI_Pos pixel_pos );
 
-/* ´´½¨µØÍ¼ */
+/* åˆ›å»ºåœ°å›¾ */
 int MapBox_CreateMap( LCUI_Widget *widget, int rows, int cols );
 
-/* µ÷ÕûµØÍ¼³ß´ç */
+/* è°ƒæ•´åœ°å›¾å°ºå¯¸ */
 int MapBox_ResizeMap( LCUI_Widget *widget, int rows, int cols );
 
-/* Ñ¡ÖĞÒ»¸öµØÍ¼¿é */
+/* é«˜äº®ä¸€ä¸ªåœ°å›¾å— */
+int MapBox_HiglightMapBlock( LCUI_Widget *widget, LCUI_Pos pos );
+
+/* é€‰ä¸­ä¸€ä¸ªåœ°å›¾å— */
 int MapBox_SelectMapBlock( LCUI_Widget *widget, LCUI_Pos pos );
 
-/* Éè¶¨µØÍ¼¿é */
+/* è®¾å®šåœ°å›¾å— */
 int MapBox_SetMapBlock(	LCUI_Widget	*widget,
 			LCUI_Pos	pos,
 			int		mapblock_id,
 			MAP_STYLE	style_id );
 
-/* ´ÓÎÄ¼şÖĞÔØÈëµØÍ¼Êı¾İ */
+/* ä»æ–‡ä»¶ä¸­è½½å…¥åœ°å›¾æ•°æ® */
 int MapBox_LoadMapData( const char *mapdata_filepath );
 
-/* ±£´æµØÍ¼Êı¾İÖÁÎÄ¼ş */
+/* ä¿å­˜åœ°å›¾æ•°æ®è‡³æ–‡ä»¶ */
 int MapBox_SaveMapData( const char *mapdata_filepath );
 
-/* ×¢²áMapBox²¿¼ş */
+/* æ³¨å†ŒMapBoxéƒ¨ä»¶ */
 void Register_MapBox(void);
 #endif

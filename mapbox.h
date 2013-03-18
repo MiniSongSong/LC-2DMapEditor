@@ -32,11 +32,11 @@ int MapBox_HiglightMapBlock( LCUI_Widget *widget, LCUI_Pos pos );
 /* 选中一个地图块 */
 int MapBox_SelectMapBlock( LCUI_Widget *widget, LCUI_Pos pos );
 
-/* 设定地图块 */
-int MapBox_SetMapBlock(	LCUI_Widget	*widget,
-			LCUI_Pos	pos,
-			int		mapblock_id,
-			MAP_STYLE	style_id );
+/* 设定已选定的地图块所使用的ID */
+int MapBox_SetMapBlock(	LCUI_Widget *widget, int mapblock_id );
+
+/* 设定当前使用的地图块 */
+void MapBox_SetCurrentMapBlock( LCUI_Widget *widget, int mapblock_id );
 
 /* 从文件中载入地图数据 */
 int MapBox_LoadMapData( const char *mapdata_filepath );

@@ -116,6 +116,10 @@ static int MapBox_RedrawMapBlock( LCUI_Widget *widget, int row, int col )
 	}
 	/* 如果有需要高亮地的图块 */
 	if( mapbox->higlight.x == col && mapbox->higlight.y == row ) {
+		if( mapbox->current_mapblock_id >= 0 ) {
+			n = mapbox->current_mapblock_id;
+			Graph_Mix( graph, &mapbox->map_blocks[n], pos );
+		}
 		Graph_Mix( graph, &border_img, pos );
 	}
 	Graph_Free( &border_img );
@@ -277,13 +281,31 @@ int MapBox_SelectMapBlock( LCUI_Widget *widget, LCUI_Pos pos )
 	return 0;
 }
 
-/* 设定地图块 */
-int MapBox_SetMapBlock(	LCUI_Widget	*widget,
-			LCUI_Pos	pos,
-			int		mapblock_id,
-			MAP_STYLE	style_id )
+/* 设定已选定的地图块所使用的ID */
+int MapBox_SetMapBlock(	LCUI_Widget *widget, int mapblock_id )
 {
+	MapBox_Data *mapbox;
+	
+	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
+	if( mapbox->selected.x == -1 || mapbox->selected.x >= mapbox->cols
+	|| mapbox->selected.y == -1 || mapbox->selected.x >= mapbox->rows ) {
+		return -1;
+	}
+	if( mapblock_id == -1 ) {
+		return -2;
+	}
+	mapbox->blocks[mapbox->selected.y][mapbox->selected.x].id = mapblock_id;
+	MapBox_RedrawMapBlock( widget, mapbox->selected.y, mapbox->selected.x );
 	return 0;
+}
+
+/* 设定当前使用的地图块 */
+void MapBox_SetCurrentMapBlock( LCUI_Widget *widget, int mapblock_id )
+{
+	MapBox_Data *mapbox;
+	
+	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
+	mapbox->current_mapblock_id = mapblock_id;
 }
 
 /* 从文件中载入地图数据 */
@@ -322,6 +344,7 @@ static void MapBox_ProcClickedEvent( LCUI_Widget *widget, LCUI_WidgetEvent *even
 
 	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
 	MapBox_SelectMapBlock( widget, mapbox->higlight );
+	MapBox_SetMapBlock( widget, mapbox->current_mapblock_id );
 }
 
 static void MapBox_ProcDragEvent( LCUI_Widget *widget, LCUI_WidgetEvent *event )
@@ -340,7 +363,7 @@ static void MapBox_ExecInit( LCUI_Widget *widget )
 	mapbox->selected.x = mapbox->selected.y = -1;
 	mapbox->higlight.x = mapbox->higlight.y = -1;
 	mapbox->blocks = NULL;
-	mapbox->current_mapblock_id = 0;
+	mapbox->current_mapblock_id = -1;
 	Graph_Init( &mapbox->map_res );
 	load_res_map( &mapbox->map_res );
 	

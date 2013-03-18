@@ -14,10 +14,14 @@
 #define IMG_PATH_ICON	"drawable/icon.png"
 #define IMG_PATH_MAP	"drawable/map.png"
 #define MAP_FILE_PATH	"map.dat"
+#define IMG_PATH_BTNV	"drawable/btn_vertiflip.png"
+#define IMG_PATH_BTNH	"drawable/btn_horizflip.png"
 
 static LCUI_Graph wnd_icon, cursor_img, map_res, map_blocks[MAP_BLOCK_TOTAL];
+static LCUI_Graph img_btn_vertiflip, img_btn_horizflip;
 static LCUI_Widget *window, *mapbox_window;
 static LCUI_Widget *btn[MAP_BLOCK_TOTAL+1], *mapbox;
+static LCUI_Widget *btn_vertiflip, *btn_horizflip;
 
 #ifdef LCUI_BUILD_IN_WIN32
 #include <io.h>
@@ -45,6 +49,10 @@ static void load_res(void)
 	Graph_Init( &wnd_icon );
 	Graph_Init( &map_res );
 	Graph_Init( &cursor_img );
+	Graph_Init( &img_btn_horizflip );
+	Graph_Init( &img_btn_vertiflip );
+	Load_Image( IMG_PATH_BTNH, &img_btn_horizflip );
+	Load_Image( IMG_PATH_BTNV, &img_btn_vertiflip );
 	Load_Image( IMG_PATH_ICON, &wnd_icon );
 	Load_Graph_Default_Cursor( &cursor_img );
 	/* 载入地图资源 */
@@ -63,6 +71,8 @@ static void free_res(void)
 	Graph_Free( &wnd_icon );
 	Graph_Free( &map_res );
 	Graph_Free( &cursor_img );
+	Graph_Free( &img_btn_horizflip );
+	Graph_Free( &img_btn_vertiflip );
 }
 
 static void proc_mapbtn_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
@@ -75,6 +85,20 @@ static void proc_mapbtn_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 		}
 	}
 	MapBox_SetCurrentMapBlock( mapbox, -1 );
+}
+
+static void proc_btn_vertiflip_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
+{
+	static LCUI_BOOL need_vertiflip = FALSE;
+	MapBox_MapBlock_VertiFlip( mapbox, !need_vertiflip );
+}
+
+static void proc_btn_horizflip_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
+{
+	static LCUI_BOOL need_horizflip = FALSE;
+	need_horizflip = !need_horizflip;
+	_DEBUG_MSG("need_horizflip: %d\n", need_horizflip);
+	MapBox_MapBlock_HorizFlip( mapbox, need_horizflip );
 }
 
 static void map_toolbox_init(void)
@@ -127,7 +151,7 @@ static void window_init(void)
 	Window_SetTitleIcon( window, &wnd_icon );
 	Widget_Resize( window, Size(320, 240) );
 	Widget_Event_Connect( Window_GetCloseButton(window), EVENT_CLICKED, destroy );
-	Widget_Show(window);	
+	Widget_Show(window);
 }
 
 static void mapbox_init(void)
@@ -138,6 +162,28 @@ static void mapbox_init(void)
 	Widget_SetAlign( mapbox, ALIGN_MIDDLE_CENTER, Pos(0,0) );
 	MapBox_CreateMap( mapbox, 4, 4 );
 	Widget_Show( mapbox );
+}
+
+static void flipbtn_init(void)
+{
+	btn_vertiflip = Widget_New("button");
+	btn_horizflip = Widget_New("button");
+	Window_ClientArea_Add( window, btn_vertiflip );
+	Window_ClientArea_Add( window, btn_horizflip );
+	Widget_SetAutoSize( btn_vertiflip, FALSE, 0 );
+	Widget_SetAutoSize( btn_horizflip, FALSE, 0 );
+	Widget_Resize( btn_vertiflip, Size(27,27) );
+	Widget_Resize( btn_horizflip, Size(27,27) );
+	Widget_SetBackgroundImage( btn_vertiflip, &img_btn_vertiflip );
+	Widget_SetBackgroundImage( btn_horizflip, &img_btn_horizflip );
+	Widget_SetBackgroundLayout( btn_vertiflip, LAYOUT_CENTER );
+	Widget_SetBackgroundLayout( btn_horizflip, LAYOUT_CENTER );
+	Widget_SetAlign( btn_vertiflip, ALIGN_BOTTOM_RIGHT, Pos(0,0) );
+	Widget_SetAlign( btn_horizflip, ALIGN_BOTTOM_RIGHT, Pos(-27,0) );
+	Widget_Event_Connect( btn_vertiflip, EVENT_CLICKED, proc_btn_vertiflip_clicked );
+	Widget_Event_Connect( btn_horizflip, EVENT_CLICKED, proc_btn_horizflip_clicked );
+	Widget_Show( btn_vertiflip );
+	Widget_Show( btn_horizflip );
 }
 
 #ifdef LCUI_BUILD_IN_WIN32
@@ -156,6 +202,7 @@ int main(void)
 	window_init();
 	mapbox_init();
 	map_toolbox_init();
+	flipbtn_init();
 	LCUIApp_AtQuit( free_res );
 	return LCUI_Main();
 }

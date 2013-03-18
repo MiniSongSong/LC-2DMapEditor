@@ -1,15 +1,5 @@
 #ifndef __MAPBOX_H__
 #define __MAPBOX_H__
-// 地图块样式
-typedef enum _MAP_STYLE {
-	MAP_STYLE_NORMAL,	// 正常样式
-	MAP_STYLE_LEFT_90,	// 左旋转90度
-	MAP_STYLE_LEFT_180,	// 左旋转180度
-	MAP_STYLE_RIGHT_90,	// 右旋转90度
-	MAP_STYLE_RIGHT_180,	// 右旋转180度
-	MAP_STYLE_HORIZ,	// 水平翻转
-	MAP_STYLE_VERTI		// 垂直翻转
-} MAP_STYLE;
 
 /* 计算地图尺寸 */
 LCUI_Size MapBox_CountSize( LCUI_Widget *widget );
@@ -37,6 +27,12 @@ int MapBox_SetMapBlock(	LCUI_Widget *widget, int mapblock_id );
 
 /* 设定当前使用的地图块 */
 void MapBox_SetCurrentMapBlock( LCUI_Widget *widget, int mapblock_id );
+
+/* 对已选中的地图块进行垂直翻转 */
+int MapBox_MapBlock_VertiFlip( LCUI_Widget *widget );
+
+/* 对已选中的地图块进行水平翻转 */
+int MapBox_MapBlock_HorizFlip( LCUI_Widget *widget );
 
 /* 从文件中载入地图数据 */
 int MapBox_LoadMapData( const char *mapdata_filepath );

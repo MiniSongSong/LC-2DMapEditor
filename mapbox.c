@@ -10,7 +10,6 @@ typedef struct _map_blocks_data {
 	int id;			// 地图块ID
 	LCUI_BOOL verti_flip;	// 是否垂直翻转
 	LCUI_BOOL horiz_flip;	// 是否水平翻转
-	MAP_STYLE style;	// 地图块的样式
 } map_blocks_data;
 
 typedef struct _MapBox_Data {
@@ -115,6 +114,11 @@ static int MapBox_RedrawMapBlock( LCUI_Widget *widget, int row, int col )
 		Graph_HorizFlip( img_mapblock, &buff );
 		img_mapblock = &buff;
 	}
+	if( mapbox->blocks[row][col].verti_flip ) {
+		Graph_VertiFlip( img_mapblock, &buff );
+		img_mapblock = &buff;
+	}
+
 	Graph_Mix( graph, img_mapblock, pos );
 	load_red_border( &border_img );
 	/* 如果之前已经有地图块被选中，则重绘该地图块 */
@@ -131,6 +135,7 @@ static int MapBox_RedrawMapBlock( LCUI_Widget *widget, int row, int col )
 		Graph_Mix( graph, &border_img, pos );
 	}
 	Graph_Free( &border_img );
+	Graph_Free( &buff );
 	rect.x = pos.x;
 	rect.y = pos.y;
 	rect.width = MAP_BLOCK_WIDTH;
@@ -207,7 +212,6 @@ int MapBox_CreateMap( LCUI_Widget *widget, int rows, int cols )
 			mapbox->blocks[i][j].id = 0;
 			mapbox->blocks[i][j].verti_flip = FALSE;
 			mapbox->blocks[i][j].horiz_flip = FALSE;
-			mapbox->blocks[i][j].style = MAP_STYLE_NORMAL;
 		}
 	}
 	Widget_Draw(widget);
@@ -236,7 +240,6 @@ int MapBox_ResizeMap( LCUI_Widget *widget, int rows, int cols )
 			mapbox->blocks[i][j].id = 0;
 			mapbox->blocks[i][j].verti_flip = FALSE;
 			mapbox->blocks[i][j].horiz_flip = FALSE;
-			mapbox->blocks[i][j].style = MAP_STYLE_NORMAL;
 		}
 	}
 	mapbox->rows = rows;

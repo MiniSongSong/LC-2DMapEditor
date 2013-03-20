@@ -11,17 +11,19 @@
 #include "mapbox.h"
 #include "res_map.h"
 
-#define IMG_PATH_ICON	"drawable/icon.png"
-#define IMG_PATH_MAP	"drawable/map.png"
-#define MAP_FILE_PATH	"map.dat"
-#define IMG_PATH_BTNV	"drawable/btn_vertiflip.png"
-#define IMG_PATH_BTNH	"drawable/btn_horizflip.png"
+#define IMG_PATH_ICON		"drawable/icon.png"
+#define IMG_PATH_MAP		"drawable/map.png"
+#define MAP_FILE_PATH		"map.dat"
+#define IMG_PATH_BTN_VERTI	"drawable/btn_vertiflip.png"
+#define IMG_PATH_BTN_HORIZ	"drawable/btn_horizflip.png"
+#define IMG_PATH_BTN_SAVE	"drawable/btn_save.png"
+#define IMG_PATH_BTN_RESIZE	"drawable/btn_resize.png"
 
 static LCUI_Graph wnd_icon, cursor_img, map_res, map_blocks[MAP_BLOCK_TOTAL];
-static LCUI_Graph img_btn_vertiflip, img_btn_horizflip;
+static LCUI_Graph img_btn_vertiflip, img_btn_horizflip, img_btn_save, img_btn_resize;
 static LCUI_Widget *window, *mapbox_window;
 static LCUI_Widget *btn[MAP_BLOCK_TOTAL+1], *mapbox;
-static LCUI_Widget *btn_vertiflip, *btn_horizflip;
+static LCUI_Widget *btn_vertiflip, *btn_horizflip, *btn_save, *btn_resize;
 
 #ifdef LCUI_BUILD_IN_WIN32
 #include <io.h>
@@ -51,9 +53,13 @@ static void load_res(void)
 	Graph_Init( &cursor_img );
 	Graph_Init( &img_btn_horizflip );
 	Graph_Init( &img_btn_vertiflip );
-	Load_Image( IMG_PATH_BTNH, &img_btn_horizflip );
-	Load_Image( IMG_PATH_BTNV, &img_btn_vertiflip );
+	Graph_Init( &img_btn_resize );
+	Graph_Init( &img_btn_save );
+	Load_Image( IMG_PATH_BTN_HORIZ, &img_btn_horizflip );
+	Load_Image( IMG_PATH_BTN_VERTI, &img_btn_vertiflip );
 	Load_Image( IMG_PATH_ICON, &wnd_icon );
+	Load_Image( IMG_PATH_BTN_RESIZE, &img_btn_resize );
+	Load_Image( IMG_PATH_BTN_SAVE, &img_btn_save );
 	Load_Graph_Default_Cursor( &cursor_img );
 	/* 载入地图资源 */
 	load_res_map( &map_res );
@@ -87,18 +93,63 @@ static void proc_mapbtn_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 	MapBox_SetCurrentMapBlock( mapbox, -1 );
 }
 
+/* 点击按钮后，显示地图尺寸调整窗口 */
+static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
+{
+	LCUI_Widget *wnd;
+	LCUI_Widget *label_rows, *label_cols;
+	LCUI_Widget *tb_rows, *tb_cols;
+	LCUI_Widget *btn_ok;
+	LCUI_MainLoop *loop;
+
+	wnd = Widget_New("window");
+	tb_cols = Widget_New("text_box");
+	tb_rows = Widget_New("text_box");
+	label_cols = Widget_New("label");
+	label_rows = Widget_New("label");
+	btn_ok = Widget_New("button");
+	Window_SetTitleTextW( wnd, L"调整地图尺寸" );
+	Window_ClientArea_Add( wnd, tb_cols );
+	Window_ClientArea_Add( wnd, tb_rows );
+	Window_ClientArea_Add( wnd, label_cols );
+	Window_ClientArea_Add( wnd, label_rows );
+	Window_ClientArea_Add( wnd, btn_ok );
+	Button_TextW( btn_ok, L"确定" );
+	Label_TextW( label_rows, L"行数：" );
+	Label_TextW( label_cols, L"列数：" );
+	Widget_SetAutoSize( btn_ok, FALSE, 0 );
+	Widget_Move( label_rows, Pos(4,6) );
+	Widget_Move( tb_rows, Pos(40,4) );
+	Widget_Move( label_cols, Pos(4,29) );
+	Widget_Move( tb_cols, Pos(40,27) );
+	Widget_SetAlign( btn_ok, ALIGN_BOTTOM_CENTER, Pos(0,-5) );
+	Widget_Hide( Window_GetCloseButton(wnd) );
+	Widget_Resize( tb_rows, Size(50,22) );
+	Widget_Resize( tb_cols, Size(50,22) );
+	Widget_Resize( btn_ok, Size(50,25) );
+	Widget_Resize( wnd, Size(105,120) );
+	Widget_SetModal( wnd, TRUE );
+	Widget_Show( tb_cols );
+	Widget_Show( tb_rows );
+	Widget_Show( label_cols );
+	Widget_Show( label_rows );
+	Widget_Show( btn_ok );
+	Widget_Show( wnd );
+	_DEBUG_MSG("create loop\n");
+	loop = LCUI_MainLoop_New();
+	_DEBUG_MSG("run loop\n");
+	LCUI_MainLoop_Run( loop );
+	_DEBUG_MSG("loop quit\n");
+}
+
 static void proc_btn_vertiflip_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 {
-	static LCUI_BOOL need_vertiflip = FALSE;
-	MapBox_MapBlock_VertiFlip( mapbox, !need_vertiflip );
+	MapBox_MapBlock_VertiFlip( mapbox );
 }
 
 static void proc_btn_horizflip_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 {
-	static LCUI_BOOL need_horizflip = FALSE;
-	need_horizflip = !need_horizflip;
-	_DEBUG_MSG("need_horizflip: %d\n", need_horizflip);
-	MapBox_MapBlock_HorizFlip( mapbox, need_horizflip );
+	MapBox_MapBlock_HorizFlip( mapbox );
 }
 
 static void map_toolbox_init(void)
@@ -164,26 +215,43 @@ static void mapbox_init(void)
 	Widget_Show( mapbox );
 }
 
-static void flipbtn_init(void)
+static void titebar_btn_init(void)
 {
 	btn_vertiflip = Widget_New("button");
 	btn_horizflip = Widget_New("button");
-	Window_ClientArea_Add( window, btn_vertiflip );
-	Window_ClientArea_Add( window, btn_horizflip );
+	btn_save = Widget_New("button");
+	btn_resize = Widget_New("button");
+	Window_TitleBar_Add( window, btn_vertiflip );
+	Window_TitleBar_Add( window, btn_horizflip );
+	Window_TitleBar_Add( window, btn_resize );
+	Window_TitleBar_Add( window, btn_save );
 	Widget_SetAutoSize( btn_vertiflip, FALSE, 0 );
 	Widget_SetAutoSize( btn_horizflip, FALSE, 0 );
+	Widget_SetAutoSize( btn_resize, FALSE, 0 );
+	Widget_SetAutoSize( btn_save, FALSE, 0 );
 	Widget_Resize( btn_vertiflip, Size(27,27) );
 	Widget_Resize( btn_horizflip, Size(27,27) );
+	Widget_Resize( btn_save, Size(27,27) );
+	Widget_Resize( btn_resize, Size(27,27) );
 	Widget_SetBackgroundImage( btn_vertiflip, &img_btn_vertiflip );
 	Widget_SetBackgroundImage( btn_horizflip, &img_btn_horizflip );
+	Widget_SetBackgroundImage( btn_save, &img_btn_save );
+	Widget_SetBackgroundImage( btn_resize, &img_btn_resize );
 	Widget_SetBackgroundLayout( btn_vertiflip, LAYOUT_CENTER );
 	Widget_SetBackgroundLayout( btn_horizflip, LAYOUT_CENTER );
-	Widget_SetAlign( btn_vertiflip, ALIGN_BOTTOM_RIGHT, Pos(0,0) );
-	Widget_SetAlign( btn_horizflip, ALIGN_BOTTOM_RIGHT, Pos(-27,0) );
+	Widget_SetBackgroundLayout( btn_save, LAYOUT_CENTER );
+	Widget_SetBackgroundLayout( btn_resize, LAYOUT_CENTER );
+	Widget_SetAlign( btn_vertiflip, ALIGN_BOTTOM_RIGHT, Pos(-50,0) );
+	Widget_SetAlign( btn_horizflip, ALIGN_BOTTOM_RIGHT, Pos(-(50+27),0) );
+	Widget_SetAlign( btn_resize, ALIGN_BOTTOM_RIGHT, Pos(-(50+2*27),0) );
+	Widget_SetAlign( btn_save, ALIGN_BOTTOM_RIGHT, Pos(-(50+3*27),0) );
 	Widget_Event_Connect( btn_vertiflip, EVENT_CLICKED, proc_btn_vertiflip_clicked );
 	Widget_Event_Connect( btn_horizflip, EVENT_CLICKED, proc_btn_horizflip_clicked );
+	Widget_Event_Connect( btn_resize, EVENT_CLICKED, proc_btn_resize_clicked );
 	Widget_Show( btn_vertiflip );
 	Widget_Show( btn_horizflip );
+	Widget_Show( btn_save );
+	Widget_Show( btn_resize );
 }
 
 #ifdef LCUI_BUILD_IN_WIN32
@@ -202,7 +270,7 @@ int main(void)
 	window_init();
 	mapbox_init();
 	map_toolbox_init();
-	flipbtn_init();
+	titebar_btn_init();
 	LCUIApp_AtQuit( free_res );
 	return LCUI_Main();
 }

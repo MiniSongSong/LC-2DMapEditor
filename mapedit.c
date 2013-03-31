@@ -6,6 +6,7 @@
 #include LC_WINDOW_H
 #include LC_LABEL_H
 #include LC_BUTTON_H
+#include LC_TEXTBOX_H
 #include LC_RES_H
 
 #include "mapbox.h"
@@ -93,6 +94,11 @@ static void proc_mapbtn_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 	MapBox_SetCurrentMapBlock( mapbox, -1 );
 }
 
+static void proc_btn_ok( LCUI_Widget *widget, LCUI_WidgetEvent *unused )
+{
+	LCUI_MainLoop_Quit(NULL);
+}
+
 /* 点击按钮后，显示地图尺寸调整窗口 */
 static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 {
@@ -101,7 +107,9 @@ static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *even
 	LCUI_Widget *tb_rows, *tb_cols;
 	LCUI_Widget *btn_ok;
 	LCUI_MainLoop *loop;
-
+	LCUI_Size map_size;
+	wchar_t text_cols[10], text_rows[10];
+	
 	wnd = Widget_New("window");
 	tb_cols = Widget_New("text_box");
 	tb_rows = Widget_New("text_box");
@@ -129,17 +137,41 @@ static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *even
 	Widget_Resize( btn_ok, Size(50,25) );
 	Widget_Resize( wnd, Size(105,120) );
 	Widget_SetModal( wnd, TRUE );
+	/* 限制这两个文本框只能被输入数字 */
+	TextBox_LimitInput( tb_rows, L"0123456789" );
+	TextBox_LimitInput( tb_cols, L"0123456789" );
+	/* 限制文本框最多输入3位数 */
+	TextBox_Text_SetMaxLength( tb_rows, 3 );
+	TextBox_Text_SetMaxLength( tb_cols, 3 );
+
+	map_size = MapBox_GetMapSize( mapbox );
+	wsprintf( text_rows, L"%d", map_size.h );
+	wsprintf( text_cols, L"%d", map_size.w );
+	TextBox_TextW( tb_rows, text_rows );
+	TextBox_TextW( tb_cols, text_cols );
+	
 	Widget_Show( tb_cols );
 	Widget_Show( tb_rows );
 	Widget_Show( label_cols );
 	Widget_Show( label_rows );
 	Widget_Show( btn_ok );
 	Widget_Show( wnd );
-	_DEBUG_MSG("create loop\n");
-	loop = LCUI_MainLoop_New();
-	_DEBUG_MSG("run loop\n");
-	LCUI_MainLoop_Run( loop );
-	_DEBUG_MSG("loop quit\n");
+	Widget_Event_Connect( btn_ok, EVENT_CLICKED, proc_btn_ok );
+	while(1) {
+		loop = LCUI_MainLoop_New();
+		LCUI_MainLoop_Run( loop );
+	
+		TextBox_GetText( tb_rows, text_rows, 10 );
+		TextBox_GetText( tb_cols, text_cols, 10 );
+		swscanf( text_rows, L"%d", &map_size.h );
+		swscanf( text_cols, L"%d", &map_size.w );
+		if( map_size.w > 0 && map_size.h > 0 ) {
+			break;
+		}
+		LCUI_MessageBoxW( MB_ICON_WARNING, L"无效的地图尺寸！", L"错误", MB_BTN_OK );
+	}
+	Widget_Hide( wnd );
+	Widget_Destroy( wnd );
 }
 
 static void proc_btn_vertiflip_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
@@ -254,18 +286,11 @@ static void titebar_btn_init(void)
 	Widget_Show( btn_resize );
 }
 
-#ifdef LCUI_BUILD_IN_WIN32
-int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine, int iCmdShow)
-#else
-int main(void) 
-#endif
+int LCUIMainFunc( LCUI_ARGLIST )
 {
-#ifdef LCUI_BUILD_IN_WIN32
 	InitConsoleWindow();
-	Win32_LCUI_Init( hInstance );
-#endif
 	//setenv( "LCUI_FONTFILE", "../../fonts/msyh.ttf", FALSE );
-	LCUI_Init();
+	LCUI_Init(LCUI_DEFAULT_CONFIG);
 	load_res();
 	window_init();
 	mapbox_init();

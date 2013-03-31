@@ -248,6 +248,15 @@ int MapBox_ResizeMap( LCUI_Widget *widget, int rows, int cols )
 	return 0;
 }
 
+/* 获取地图尺寸 */
+LCUI_Size MapBox_GetMapSize( LCUI_Widget *widget )
+{
+	MapBox_Data *mapbox;
+	
+	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
+	return Size( mapbox->cols, mapbox->rows );
+}
+
 /* 高亮一个地图块 */
 int MapBox_HiglightMapBlock( LCUI_Widget *widget, LCUI_Pos pos )
 {

@@ -16,6 +16,9 @@ int MapBox_CreateMap( LCUI_Widget *widget, int rows, int cols );
 /* 调整地图尺寸 */
 int MapBox_ResizeMap( LCUI_Widget *widget, int rows, int cols );
 
+/* 获取地图尺寸 */
+LCUI_Size MapBox_GetMapSize( LCUI_Widget *widget );
+
 /* 高亮一个地图块 */
 int MapBox_HiglightMapBlock( LCUI_Widget *widget, LCUI_Pos pos );
 

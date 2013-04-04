@@ -1,6 +1,8 @@
 #ifndef __MAPBOX_H__
 #define __MAPBOX_H__
 
+#include "posbox.h"
+
 /* 计算地图尺寸 */
 LCUI_Size MapBox_CountSize( LCUI_Widget *widget );
 
@@ -14,7 +16,7 @@ LCUI_Pos MapBox_MapBlock_GetPos( LCUI_Widget *widget, LCUI_Pos pixel_pos );
 int MapBox_CreateMap( LCUI_Widget *widget, int rows, int cols );
 
 /* 调整地图尺寸 */
-int MapBox_ResizeMap( LCUI_Widget *widget, int rows, int cols );
+int MapBox_ResizeMap( LCUI_Widget *widget, int rows, int cols, POSBOX_POS flag );
 
 /* 获取地图尺寸 */
 LCUI_Size MapBox_GetMapSize( LCUI_Widget *widget );

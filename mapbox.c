@@ -219,21 +219,27 @@ int MapBox_CreateMap( LCUI_Widget *widget, int rows, int cols )
 }
 
 /* 调整地图尺寸 */
-int MapBox_ResizeMap( LCUI_Widget *widget, int rows, int cols )
+int MapBox_ResizeMap( LCUI_Widget *widget, int rows, int cols, POSBOX_POS flag )
 {
 	int i, j;
 	MapBox_Data *mapbox;
+	map_blocks_data **new_mapblocks;
 	
 	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
-	mapbox->blocks = (map_blocks_data**)realloc( 
-	mapbox->blocks, rows*sizeof(map_blocks_data*) );
+	new_mapblocks = (map_blocks_data**)
+			malloc( rows*sizeof(map_blocks_data*) );
 	if( !mapbox->blocks ) {
 		return -1;
 	}
+
 	for(i=0; i<rows; ++i) {
-		mapbox->blocks[i] = (map_blocks_data*)realloc(
-		mapbox->blocks[i], cols*sizeof(map_blocks_data) );
-		if( !mapbox->blocks[i] ) {
+		new_mapblocks[i] = (map_blocks_data*)malloc( cols
+					*sizeof(map_blocks_data) );
+		if( !new_mapblocks[i] ) {
+			for(j=i-1; j>=0; --j) {
+				free( new_mapblocks[i] );
+			}
+			free( new_mapblocks );
 			return -1;
 		}
 		for(j=0; j<cols-mapbox->cols; ++j) {

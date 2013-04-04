@@ -13,6 +13,9 @@ typedef enum POSBOX_POS_ {
 	POS_BOTTOMRIGHT
 } POSBOX_POS;
 
+/* 获取PosBox部件中记录的定位 */
+POSBOX_POS PosBox_GetPos( LCUI_Widget *widget );
+
 /* 注册PosBox部件 */
 void Register_PosBox(void);
 

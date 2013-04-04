@@ -250,6 +250,14 @@ static void PosBox_ExecUpdate( LCUI_Widget *widget )
 	}
 }
 
+/* 获取PosBox部件中记录的定位 */
+POSBOX_POS PosBox_GetPos( LCUI_Widget *widget )
+{
+	PosBox_Data *posbox;
+	posbox = (PosBox_Data *)Widget_GetPrivData( widget );
+	return posbox->pos;
+}
+
 /* 注册PosBox部件 */
 void Register_PosBox(void)
 {

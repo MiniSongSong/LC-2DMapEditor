@@ -242,12 +242,13 @@ int MapBox_ResizeMap( LCUI_Widget *widget, int rows, int cols, POSBOX_POS flag )
 			free( new_mapblocks );
 			return -1;
 		}
-		for(j=0; j<cols-mapbox->cols; ++j) {
-			mapbox->blocks[i][j].id = 0;
-			mapbox->blocks[i][j].verti_flip = FALSE;
-			mapbox->blocks[i][j].horiz_flip = FALSE;
+		for(j=0; j<cols; ++j) {
+			new_mapblocks[i][j].id = 0;
+			new_mapblocks[i][j].verti_flip = FALSE;
+			new_mapblocks[i][j].horiz_flip = FALSE;
 		}
 	}
+	mapbox->blocks = new_mapblocks;
 	mapbox->rows = rows;
 	mapbox->cols = cols;
 	Widget_Draw( widget );

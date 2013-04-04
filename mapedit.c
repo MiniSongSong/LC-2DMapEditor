@@ -94,14 +94,24 @@ static void proc_mapbtn_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 	MapBox_SetCurrentMapBlock( mapbox, -1 );
 }
 
+static int button_type = 0;
+
 static void proc_btn_ok( LCUI_Widget *widget, LCUI_WidgetEvent *unused )
 {
+	button_type = 0;
+	LCUI_MainLoop_Quit(NULL);
+}
+
+static void porc_btn_cancel( LCUI_Widget *widget, LCUI_WidgetEvent *unused )
+{
+	button_type = 1;
 	LCUI_MainLoop_Quit(NULL);
 }
 
 /* 点击按钮后，显示地图尺寸调整窗口 */
 static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 {
+	POSBOX_POS flag;
 	LCUI_Widget *wnd;
 	LCUI_Widget *label_oldsize, *label_x, *label_newsize;
 	LCUI_Widget *tb_rows, *tb_cols;
@@ -190,10 +200,13 @@ static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *even
 	Widget_Show( wnd );
 
 	Widget_Event_Connect( btn_ok, EVENT_CLICKED, proc_btn_ok );
+	Widget_Event_Connect( btn_cancel, EVENT_CLICKED, porc_btn_cancel );
 	while(1) {
 		loop = LCUI_MainLoop_New();
 		LCUI_MainLoop_Run( loop );
-
+		if( button_type == 1 ) {
+			break;
+		}
 		TextBox_GetText( tb_rows, text_rows, 10 );
 		TextBox_GetText( tb_cols, text_cols, 10 );
 		swscanf( text_rows, L"%d", &map_size.h );
@@ -203,6 +216,8 @@ static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *even
 		}
 		LCUI_MessageBoxW( MB_ICON_WARNING, L"无效的地图尺寸！", L"错误", MB_BTN_OK );
 	}
+	flag = PosBox_GetPos( posbox );
+	MapBox_ResizeMap( mapbox, map_size.h, map_size.w, flag );
 	Widget_Hide( wnd );
 	Widget_Destroy( wnd );
 }

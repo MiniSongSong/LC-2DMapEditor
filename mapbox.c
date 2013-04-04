@@ -46,7 +46,7 @@ LCUI_Pos MapBox_MapBlock_GetPixelPos( LCUI_Widget *widget, int row, int col )
 	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
 	map_size = MapBox_CountSize( widget );
 	/* 计算像素坐标，和MapBox_ExecDraw函数中的计算方法基本一样 */
-	x = map_size.w/2.0 - MAP_BLOCK_WIDTH/2.0;
+	x = (mapbox->rows-1)*MAP_BLOCK_WIDTH/2.0;
 	x -= (MAP_BLOCK_WIDTH*row/2.0);
 	y = (MAP_BLOCK_HEIGHT*row/2.0);
 	x += (MAP_BLOCK_WIDTH*col/2.0);
@@ -67,7 +67,7 @@ LCUI_Pos MapBox_MapBlock_GetPos( LCUI_Widget *widget, LCUI_Pos pixel_pos )
 
 	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
 	map_size = MapBox_CountSize( widget );
-	start_x = map_size.w/2.0 - MAP_BLOCK_WIDTH/2.0;
+	start_x = (mapbox->rows-1)*MAP_BLOCK_WIDTH/2.0;
 	start_y = 0;
 	for( i=0; i<mapbox->rows; ++i ) {
 		x = start_x;
@@ -165,7 +165,7 @@ static void MapBox_ExecDraw( LCUI_Widget *widget )
 	DEBUG_MSG("map size: %d,%d\n", map_size.w, map_size.h);
 	graph = Widget_GetSelfGraph( widget );
 	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
-	start_x = size.w/2.0 - MAP_BLOCK_WIDTH/2.0;
+	start_x = (mapbox->rows-1)*MAP_BLOCK_WIDTH/2.0;
 	start_y = 0;
 	DEBUG_MSG("rows: %d, cols: %d\n", mapbox->rows, mapbox->cols);
 	/* 根据地图数据进行绘图 */
@@ -221,7 +221,8 @@ int MapBox_CreateMap( LCUI_Widget *widget, int rows, int cols )
 /* 调整地图尺寸 */
 int MapBox_ResizeMap( LCUI_Widget *widget, int rows, int cols, POSBOX_POS flag )
 {
-	int i, j;
+	int i, j, x, y;
+	LCUI_Rect rect, cut_rect;
 	MapBox_Data *mapbox;
 	map_blocks_data **new_mapblocks;
 	
@@ -248,6 +249,63 @@ int MapBox_ResizeMap( LCUI_Widget *widget, int rows, int cols, POSBOX_POS flag )
 			new_mapblocks[i][j].horiz_flip = FALSE;
 		}
 	}
+
+	switch(flag) {
+	case POS_TOPLEFT:
+		rect.x = rect.y = 0;
+		break;
+	case POS_TOPCENTER:
+		rect.x = (cols - mapbox->cols)/2;
+		rect.y = 0;
+		break;
+	case POS_TOPRIGHT: 
+		rect.x = cols - mapbox->cols;
+		rect.y = 0;
+		break;
+	case POS_MIDDLELEFT:
+		rect.x = 0;
+		rect.y = (rows - mapbox->rows)/2;
+		break;
+	case POS_MIDDLECENTER:
+		rect.x = (cols - mapbox->cols)/2;
+		rect.y = (rows - mapbox->rows)/2;
+		break;
+	case POS_MIDDLERIGHT:
+		rect.x = cols - mapbox->cols;
+		rect.y = (rows - mapbox->rows)/2;
+		break;
+	case POS_BOTTOMLEFT:
+		rect.x = 0;
+		rect.y = rows - mapbox->rows;
+		break;
+	case POS_BOTTOMCENTER:
+		rect.x = (cols - mapbox->cols)/2;
+		rect.y = rows - mapbox->rows;
+		break;
+	case POS_BOTTOMRIGHT:
+		rect.x = cols - mapbox->cols;
+		rect.y = rows - mapbox->rows;
+		break;
+	}
+	rect.width = mapbox->cols;
+	rect.height = mapbox->rows;
+	
+	if( LCUIRect_GetCutArea( Size(cols,rows), rect, &cut_rect )) {
+		rect.x += cut_rect.x;
+		rect.y += cut_rect.y;
+	}
+	
+	for( i=rect.y,y=0; y<cut_rect.height; ++y,++i ) {
+		for( j=rect.x,x=0; x<cut_rect.width; ++x,++j ) { 
+			new_mapblocks[i][j] = mapbox->blocks[y+cut_rect.y][cut_rect.x+x];
+		}
+	}
+	/* 释放之前的地图块信息 */
+	for(i=0; i<mapbox->rows; ++i) {
+		free( mapbox->blocks[i] );
+	}
+	free( mapbox->blocks );
+	/* 记录新的地图块信息 */
 	mapbox->blocks = new_mapblocks;
 	mapbox->rows = rows;
 	mapbox->cols = cols;

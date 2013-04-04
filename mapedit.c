@@ -94,6 +94,48 @@ static void proc_mapbtn_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 	MapBox_SetCurrentMapBlock( mapbox, -1 );
 }
 
+/* 更新地图位置 */
+static void 
+update_mapbox_pos( LCUI_Widget *widget, LCUI_WidgetEvent *event )
+{
+	LCUI_Pos pos;
+	LCUI_Size mapbox_size, ctnr_size;
+
+	ctnr_size = Widget_GetContainerSize( Window_GetClientArea(window) );
+	mapbox_size = Widget_GetSize( mapbox );
+	if( mapbox_size.w <= ctnr_size.w
+	 && mapbox_size.h <= ctnr_size.h ) {
+		Widget_SetAlign( mapbox, ALIGN_MIDDLE_CENTER, Pos(0,0) );
+		return;
+	}
+	pos = Widget_GetPos( mapbox );
+	/* 调整坐标 */
+	if( pos.x > 0 ) {
+		pos.x = 0;
+	}
+	if( pos.y > 0 ) {
+		pos.y = 0;
+	}
+	if( pos.x + mapbox_size.w  < ctnr_size.w ) {
+		pos.x = ctnr_size.w - mapbox_size.w;
+	}
+	if( pos.y + mapbox_size.h  < ctnr_size.h ) {
+		pos.y = ctnr_size.h - mapbox_size.h;
+	}
+	/* 根据地图尺寸，进行不同调整 */
+	if( mapbox_size.w > ctnr_size.w
+	 && mapbox_size.h <= ctnr_size.h ) {
+		pos.y = (ctnr_size.h-mapbox_size.h)/2;
+	} else if( mapbox_size.w <= ctnr_size.w
+	 && mapbox_size.h > ctnr_size.h ) {
+		pos.x = (ctnr_size.w-mapbox_size.w)/2;
+	}
+	/* 解除之前设定的align */
+	Widget_SetAlign( mapbox, ALIGN_NONE, Pos(0,0) );
+	_DEBUG_MSG("pos: %d,%d\n", pos.x, pos.y);
+	Widget_Move( mapbox, pos );
+}
+
 static int button_type = 0;
 
 static void proc_btn_ok( LCUI_Widget *widget, LCUI_WidgetEvent *unused )
@@ -212,12 +254,12 @@ static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *even
 		swscanf( text_rows, L"%d", &map_size.h );
 		swscanf( text_cols, L"%d", &map_size.w );
 		if( map_size.w > 0 && map_size.h > 0 ) {
+			flag = PosBox_GetPos( posbox );
+			MapBox_ResizeMap( mapbox, map_size.h, map_size.w, flag );
 			break;
 		}
 		LCUI_MessageBoxW( MB_ICON_WARNING, L"无效的地图尺寸！", L"错误", MB_BTN_OK );
 	}
-	flag = PosBox_GetPos( posbox );
-	MapBox_ResizeMap( mapbox, map_size.h, map_size.w, flag );
 	Widget_Hide( wnd );
 	Widget_Destroy( wnd );
 }
@@ -285,6 +327,51 @@ static void window_init(void)
 	Widget_Show(window);
 }
 
+static void proc_mapbox_drag( LCUI_Widget *widget, LCUI_WidgetEvent *event )
+{
+	LCUI_Pos offset, pos;
+	LCUI_Size mapbox_size, ctnr_size;
+
+	pos = Widget_GetGlobalPos( widget );
+	offset = Pos_Sub( event->drag.new_pos, pos );
+	pos = Widget_GetPos( widget );
+	pos = Pos_Add( pos, offset );
+
+	ctnr_size = Widget_GetContainerSize( Window_GetClientArea(window) );
+	mapbox_size = Widget_GetSize( mapbox );
+	if( mapbox_size.w <= ctnr_size.w
+	 && mapbox_size.h <= ctnr_size.h ) {
+		Widget_SetAlign( mapbox, ALIGN_MIDDLE_CENTER, Pos(0,0) );
+		return;
+	}
+	/* 调整坐标 */
+	if( pos.x > 0 ) {
+		pos.x = 0;
+	}
+	if( pos.y > 0 ) {
+		pos.y = 0;
+	}
+	if( pos.x + mapbox_size.w  < ctnr_size.w ) {
+		pos.x = ctnr_size.w - mapbox_size.w;
+	}
+	if( pos.y + mapbox_size.h  < ctnr_size.h ) {
+		pos.y = ctnr_size.h - mapbox_size.h;
+	}
+	/* 根据地图尺寸，进行不同调整 */
+	if( mapbox_size.w > ctnr_size.w
+	 && mapbox_size.h <= ctnr_size.h ) {
+		pos.y = (ctnr_size.h-mapbox_size.h)/2;
+	} else if( mapbox_size.w <= ctnr_size.w
+	 && mapbox_size.h > ctnr_size.h ) {
+		pos.x = (ctnr_size.w-mapbox_size.w)/2;
+	}
+
+	/* 解除之前设定的align */
+	Widget_SetAlign( widget, ALIGN_NONE, Pos(0,0) );
+	Widget_Move( widget, pos );
+}
+
+
 static void mapbox_init(void)
 {
 	Register_MapBox();
@@ -293,6 +380,9 @@ static void mapbox_init(void)
 	Widget_SetAlign( mapbox, ALIGN_MIDDLE_CENTER, Pos(0,0) );
 	MapBox_CreateMap( mapbox, 4, 4 );
 	Widget_Show( mapbox );
+	Widget_Event_Connect( mapbox, EVENT_DRAG, proc_mapbox_drag );
+	/* 在地图框改变尺寸时，更新它在窗口内的位置 */
+	Widget_Event_Connect( mapbox, EVENT_RESIZE, update_mapbox_pos );
 }
 
 static void titebar_btn_init(void)

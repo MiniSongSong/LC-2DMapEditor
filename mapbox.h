@@ -40,10 +40,10 @@ int MapBox_MapBlock_VertiFlip( LCUI_Widget *widget );
 int MapBox_MapBlock_HorizFlip( LCUI_Widget *widget );
 
 /* 从文件中载入地图数据 */
-int MapBox_LoadMapData( const char *mapdata_filepath );
+int MapBox_LoadMapData( LCUI_Widget *widget, const char *mapdata_filepath );
 
 /* 保存地图数据至文件 */
-int MapBox_SaveMapData( const char *mapdata_filepath );
+int MapBox_SaveMapData( LCUI_Widget *widget, const char *mapdata_filepath );
 
 /* 注册MapBox部件 */
 void Register_MapBox(void);

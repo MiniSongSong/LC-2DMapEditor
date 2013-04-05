@@ -19,6 +19,8 @@
 #define IMG_PATH_BTN_HORIZ	"drawable/btn_horizflip.png"
 #define IMG_PATH_BTN_SAVE	"drawable/btn_save.png"
 #define IMG_PATH_BTN_RESIZE	"drawable/btn_resize.png"
+#define MAPFILE_PATH		"map.dat"
+
 
 static LCUI_Graph wnd_icon, cursor_img, map_res, map_blocks[MAP_BLOCK_TOTAL];
 static LCUI_Graph img_btn_vertiflip, img_btn_horizflip, img_btn_save, img_btn_resize;
@@ -150,6 +152,18 @@ static void porc_btn_cancel( LCUI_Widget *widget, LCUI_WidgetEvent *unused )
 	LCUI_MainLoop_Quit(NULL);
 }
 
+static void proc_btn_save( LCUI_Widget *widget, LCUI_WidgetEvent *unused )
+{
+	int ret;
+	ret = MapBox_SaveMapData( mapbox, MAPFILE_PATH );
+	if( ret != 0 ) {
+		LCUI_MessageBoxW( MB_ICON_ERROR, L"地图数据保存出错！", L"错误", MB_BTN_OK );
+	} else {
+		LCUI_MessageBoxW( MB_ICON_INFO, L"地图数据保存成功！", L"提示", MB_BTN_OK );
+	}
+}
+
+
 /* 点击按钮后，显示地图尺寸调整窗口 */
 static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 {
@@ -175,7 +189,7 @@ static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *even
 	btn_cancel = Widget_New("button");
 
 	Window_SetTitleTextW( wnd, L"地图大小" );
-	
+	/* 将部件添加至窗口客户区中 */
 	Window_ClientArea_Add( wnd, tb_cols );
 	Window_ClientArea_Add( wnd, tb_rows );
 	Window_ClientArea_Add( wnd, label_newsize );
@@ -185,17 +199,17 @@ static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *even
 	Window_ClientArea_Add( wnd, btn_ok );
 	Window_ClientArea_Add( wnd, btn_cancel );
 	Window_ClientArea_Add( wnd, posbox );
-
+	/* 设置按钮文本 */
 	Button_TextW( btn_ok, L"确定" );
 	Button_TextW( btn_cancel, L"取消" );
-	
+	/* 设置label部件显示的文本 */
 	Label_TextW( label_newsize, L"新的大小：" );
 	Label_TextW( label_x, L"x" );
 	Label_TextW( label_pos, L"伸缩方向：" );
 
 	Widget_SetAutoSize( btn_ok, FALSE, 0 );
 	Widget_SetAutoSize( btn_cancel, FALSE, 0 );
-	
+	/* 调整部件的位置 */
 	Widget_Move( label_oldsize, Pos(4,6) );
 	Widget_Move( label_newsize, Pos(4,29) );
 	Widget_Move( tb_cols, Pos(40+22,27) );
@@ -207,13 +221,13 @@ static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *even
 	Widget_SetAlign( btn_ok, ALIGN_BOTTOM_CENTER, Pos(-26,-5) );
 	Widget_SetAlign( btn_cancel, ALIGN_BOTTOM_CENTER, Pos(26,-5) );
 	Widget_Hide( Window_GetCloseButton(wnd) );
-	
+	/* 调整按钮的尺寸 */
 	Widget_Resize( tb_rows, Size(28,22) );
 	Widget_Resize( tb_cols, Size(28,22) );
 	Widget_Resize( btn_ok, Size(50,25) );
 	Widget_Resize( btn_cancel, Size(50,25) );
 	Widget_Resize( wnd, Size(155,215) );
-
+	/* 设置当前窗口为模态部件 */
 	Widget_SetModal( wnd, TRUE );
 	/* 限制这两个文本框只能被输入数字 */
 	TextBox_LimitInput( tb_rows, L"0123456789" );
@@ -258,22 +272,26 @@ static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *even
 			MapBox_ResizeMap( mapbox, map_size.h, map_size.w, flag );
 			break;
 		}
-		LCUI_MessageBoxW( MB_ICON_WARNING, L"无效的地图尺寸！", L"错误", MB_BTN_OK );
+		LCUI_MessageBoxW( MB_ICON_WARNING, 
+		L"无效的地图尺寸！", L"错误", MB_BTN_OK );
 	}
 	Widget_Hide( wnd );
 	Widget_Destroy( wnd );
 }
 
-static void proc_btn_vertiflip_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
+static void 
+proc_btn_vertiflip_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 {
 	MapBox_MapBlock_VertiFlip( mapbox );
 }
 
-static void proc_btn_horizflip_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
+static void 
+proc_btn_horizflip_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 {
 	MapBox_MapBlock_HorizFlip( mapbox );
 }
 
+/* 初始化地图块窗口 */
 static void map_toolbox_init(void)
 {
 	int i;
@@ -285,8 +303,10 @@ static void map_toolbox_init(void)
 	size.w = 2*MAP_BLOCK_WIDTH+10;
 	size.h = (int)(MAP_BLOCK_TOTAL/2.0+0.5)*MAP_BLOCK_WIDTH + 32;
 	Widget_Resize( mapbox_window, size );
+	/* 隐藏窗口右上角的关闭按钮 */
 	Widget_Hide( Window_GetCloseButton(mapbox_window) );
 	
+	/* 创建地图块按钮，并计算出相应的坐标 */
 	pos.y = -MAP_BLOCK_WIDTH;
 	for(i=0; i<MAP_BLOCK_TOTAL+1; ++i) {
 		if( i%2==0 ) {
@@ -317,6 +337,7 @@ static void destroy( LCUI_Widget *widget, LCUI_WidgetEvent *unused )
 	LCUI_MainLoop_Quit(NULL);
 }
 
+/* 初始化主窗口 */
 static void window_init(void)
 {
 	window = Widget_New("window");
@@ -331,7 +352,7 @@ static void proc_mapbox_drag( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 {
 	LCUI_Pos offset, pos;
 	LCUI_Size mapbox_size, ctnr_size;
-
+	
 	pos = Widget_GetGlobalPos( widget );
 	offset = Pos_Sub( event->drag.new_pos, pos );
 	pos = Widget_GetPos( widget );
@@ -371,7 +392,7 @@ static void proc_mapbox_drag( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 	Widget_Move( widget, pos );
 }
 
-
+/* 初始化MapBox部件 */
 static void mapbox_init(void)
 {
 	Register_MapBox();
@@ -379,30 +400,37 @@ static void mapbox_init(void)
 	Window_ClientArea_Add( window, mapbox );
 	Widget_SetAlign( mapbox, ALIGN_MIDDLE_CENTER, Pos(0,0) );
 	MapBox_CreateMap( mapbox, 4, 4 );
-	Widget_Show( mapbox );
 	Widget_Event_Connect( mapbox, EVENT_DRAG, proc_mapbox_drag );
 	/* 在地图框改变尺寸时，更新它在窗口内的位置 */
 	Widget_Event_Connect( mapbox, EVENT_RESIZE, update_mapbox_pos );
+	MapBox_LoadMapData( mapbox, MAPFILE_PATH );
+	Widget_Show( mapbox );
 }
 
+/* 初始化主窗口标题栏内的按钮 */
 static void titebar_btn_init(void)
 {
+	/* 创建按钮 */
 	btn_vertiflip = Widget_New("button");
 	btn_horizflip = Widget_New("button");
 	btn_save = Widget_New("button");
 	btn_resize = Widget_New("button");
+	/* 添加按钮 */
 	Window_TitleBar_Add( window, btn_vertiflip );
 	Window_TitleBar_Add( window, btn_horizflip );
 	Window_TitleBar_Add( window, btn_resize );
 	Window_TitleBar_Add( window, btn_save );
+	/* 设置按钮不自动改变尺寸 */
 	Widget_SetAutoSize( btn_vertiflip, FALSE, 0 );
 	Widget_SetAutoSize( btn_horizflip, FALSE, 0 );
 	Widget_SetAutoSize( btn_resize, FALSE, 0 );
 	Widget_SetAutoSize( btn_save, FALSE, 0 );
+	/* 设置按钮尺寸 */
 	Widget_Resize( btn_vertiflip, Size(27,27) );
 	Widget_Resize( btn_horizflip, Size(27,27) );
 	Widget_Resize( btn_save, Size(27,27) );
 	Widget_Resize( btn_resize, Size(27,27) );
+	/* 设置按钮的背景图以及布局 */
 	Widget_SetBackgroundImage( btn_vertiflip, &img_btn_vertiflip );
 	Widget_SetBackgroundImage( btn_horizflip, &img_btn_horizflip );
 	Widget_SetBackgroundImage( btn_save, &img_btn_save );
@@ -411,13 +439,17 @@ static void titebar_btn_init(void)
 	Widget_SetBackgroundLayout( btn_horizflip, LAYOUT_CENTER );
 	Widget_SetBackgroundLayout( btn_save, LAYOUT_CENTER );
 	Widget_SetBackgroundLayout( btn_resize, LAYOUT_CENTER );
+	/* 设置按钮的位置 */
 	Widget_SetAlign( btn_vertiflip, ALIGN_BOTTOM_RIGHT, Pos(-50,0) );
 	Widget_SetAlign( btn_horizflip, ALIGN_BOTTOM_RIGHT, Pos(-(50+27),0) );
 	Widget_SetAlign( btn_resize, ALIGN_BOTTOM_RIGHT, Pos(-(50+2*27),0) );
 	Widget_SetAlign( btn_save, ALIGN_BOTTOM_RIGHT, Pos(-(50+3*27),0) );
+	/* 为按钮关联相应事件 */
 	Widget_Event_Connect( btn_vertiflip, EVENT_CLICKED, proc_btn_vertiflip_clicked );
 	Widget_Event_Connect( btn_horizflip, EVENT_CLICKED, proc_btn_horizflip_clicked );
 	Widget_Event_Connect( btn_resize, EVENT_CLICKED, proc_btn_resize_clicked );
+	Widget_Event_Connect( btn_save, EVENT_CLICKED, proc_btn_save );
+	/* 显示它们 */
 	Widget_Show( btn_vertiflip );
 	Widget_Show( btn_horizflip );
 	Widget_Show( btn_save );

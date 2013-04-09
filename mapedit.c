@@ -14,7 +14,6 @@
 
 #define IMG_PATH_ICON		"drawable/icon.png"
 #define IMG_PATH_MAP		"drawable/map.png"
-#define MAP_FILE_PATH		"map.dat"
 #define IMG_PATH_BTN_VERTI	"drawable/btn_vertiflip.png"
 #define IMG_PATH_BTN_HORIZ	"drawable/btn_horizflip.png"
 #define IMG_PATH_BTN_SAVE	"drawable/btn_save.png"
@@ -24,6 +23,7 @@
 
 static LCUI_Graph wnd_icon, cursor_img, map_res, map_blocks[MAP_BLOCK_TOTAL];
 static LCUI_Graph img_btn_vertiflip, img_btn_horizflip, img_btn_save, img_btn_resize;
+
 static LCUI_Widget *window, *mapbox_window;
 static LCUI_Widget *btn[MAP_BLOCK_TOTAL+1], *mapbox;
 static LCUI_Widget *btn_vertiflip, *btn_horizflip, *btn_save, *btn_resize;
@@ -65,12 +65,16 @@ static void load_res(void)
 	Load_Image( IMG_PATH_BTN_SAVE, &img_btn_save );
 	Load_Graph_Default_Cursor( &cursor_img );
 	/* 载入地图资源 */
-	load_res_map( &map_res );
+	i = Load_Image( IMG_PATH_MAP, &map_res );
+	if( i != 0 ) {
+		LCUI_MessageBoxW( MB_ICON_ERROR, L"地图块的图像资源载入失败！", L"资源载入出错", MB_BTN_OK );
+		return;
+	}
 	rect.x = rect.y = 0;
-	rect.width = 45;
-	rect.height = 21;
+	rect.width = MAP_BLOCK_WIDTH;
+	rect.height = MAP_BLOCK_HEIGHT;
 	/* 引用出每一个地图图块 */
-	for(i=0; i<7; ++i, rect.x+=44) {
+	for(i=0; i<MAP_BLOCK_TOTAL; ++i, rect.x+=MAP_BLOCK_WIDTH) {
 		Graph_Quote( &map_blocks[i], &map_res, rect );
 	}
 }
@@ -134,7 +138,6 @@ update_mapbox_pos( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 	}
 	/* 解除之前设定的align */
 	Widget_SetAlign( mapbox, ALIGN_NONE, Pos(0,0) );
-	_DEBUG_MSG("pos: %d,%d\n", pos.x, pos.y);
 	Widget_Move( mapbox, pos );
 }
 
@@ -329,6 +332,7 @@ static void map_toolbox_init(void)
 		Widget_Event_Connect( btn[i], EVENT_CLICKED, proc_mapbtn_clicked );
 		Widget_Show( btn[i] );
 	}
+	Widget_SetZIndex( mapbox_window, 10 );
 	Widget_Show(mapbox_window);
 }
 
@@ -345,6 +349,7 @@ static void window_init(void)
 	Window_SetTitleIcon( window, &wnd_icon );
 	Widget_Resize( window, Size(640, 480) );
 	Widget_Event_Connect( Window_GetCloseButton(window), EVENT_CLICKED, destroy );
+	Widget_SetZIndex( window, 0 );
 	Widget_Show(window);
 }
 
@@ -395,10 +400,16 @@ static void proc_mapbox_drag( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 /* 初始化MapBox部件 */
 static void mapbox_init(void)
 {
+	int i;
 	Register_MapBox();
 	mapbox = Widget_New("mapbox");
 	Window_ClientArea_Add( window, mapbox );
 	Widget_SetAlign( mapbox, ALIGN_MIDDLE_CENTER, Pos(0,0) );
+	MapBox_SetMapBlockSize( mapbox, MAP_BLOCK_WIDTH, MAP_BLOCK_HEIGHT );
+	/* 设置MapBox部件的地图图块 */
+	for(i=0; i<7; ++i) {
+		MapBox_SetMapBlockIMG( mapbox, i, &map_blocks[i] );
+	}
 	MapBox_CreateMap( mapbox, 4, 4 );
 	Widget_Event_Connect( mapbox, EVENT_DRAG, proc_mapbox_drag );
 	/* 在地图框改变尺寸时，更新它在窗口内的位置 */

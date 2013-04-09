@@ -27,6 +27,12 @@ int MapBox_HiglightMapBlock( LCUI_Widget *widget, LCUI_Pos pos );
 /* 选中一个地图块 */
 int MapBox_SelectMapBlock( LCUI_Widget *widget, LCUI_Pos pos );
 
+/* 设置地图块的尺寸 */
+void MapBox_SetMapBlockSize( LCUI_Widget *widget, int width, int height );
+
+/* 设定指定ID的地图块的图像 */
+int MapBox_SetMapBlockIMG( LCUI_Widget *widget, int id, LCUI_Graph *mapblk_img );
+
 /* 设定已选定的地图块所使用的ID */
 int MapBox_SetMapBlock(	LCUI_Widget *widget, int mapblock_id );
 

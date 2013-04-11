@@ -414,8 +414,26 @@ static void mapbox_init(void)
 	Widget_Event_Connect( mapbox, EVENT_DRAG, proc_mapbox_drag );
 	/* 在地图框改变尺寸时，更新它在窗口内的位置 */
 	Widget_Event_Connect( mapbox, EVENT_RESIZE, update_mapbox_pos );
-	MapBox_LoadMapData( mapbox, MAPFILE_PATH );
+	i = MapBox_LoadMapData( mapbox, MAPFILE_PATH );
 	Widget_Show( mapbox );
+	switch( i ) {
+	case -2:
+		LCUI_MessageBoxW( MB_ICON_ERROR,
+		 L"该版本的地图文件不被支持！",
+		 L"地图文件错误", MB_BTN_OK );
+		break;
+	case -1:
+		LCUI_MessageBoxW( MB_ICON_ERROR,
+		 L"所载入的文件不是有效的地图文件！",
+		 L"地图文件错误", MB_BTN_OK );
+		break;
+	case 0:
+		LCUI_MessageBoxW( MB_ICON_INFO,
+		 L"已经成功载入地图文件！",
+		 L"提示", MB_BTN_OK );
+		break;
+	default: break;
+	}
 }
 
 /* 初始化主窗口标题栏内的按钮 */
@@ -474,10 +492,10 @@ int LCUIMainFunc( LCUI_ARGLIST )
 	LCUI_Init(LCUI_DEFAULT_CONFIG);
 	load_res();
 	window_init();
-	mapbox_init();
 	Register_PosBox();
 	map_toolbox_init();
 	titebar_btn_init();
+	mapbox_init();
 	LCUIApp_AtQuit( free_res );
 	return LCUI_Main();
 }

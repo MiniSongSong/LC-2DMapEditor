@@ -5,14 +5,18 @@
 #include "res_map.h"
 #include "mapbox.h"
 
+#define MAPFILE_VERSION	1
 // 文件头信息
 typedef struct _mapfile_header {
+	char type[8];
+	int version;
 	int rows, cols;
 } mapfile_header;
 
 // 地图块
 typedef struct _map_blocks_data {
-	int id;			// 地图块ID
+	int blk_id;		// 地图块ID
+	int obj_id;		// 地图对象ID
 	LCUI_BOOL verti_flip;	// 是否垂直翻转
 	LCUI_BOOL horiz_flip;	// 是否水平翻转
 } map_blocks_data;
@@ -22,6 +26,12 @@ typedef struct _MapBlockIMG {
 	LCUI_Graph img;		// 地图块图像数据
 } MapBlockIMG;
 
+typedef struct _MapObjIMG {
+	int id;				// 对象的ID
+	LCUI_Graph img;			// 对象的图像数据
+	LCUI_Size occupied_size;	// 占用的地图空间尺寸
+} MapObjIMG;
+
 typedef struct _MapBox_Data {
 	int rows, cols;			// 记录地图行数与列数j
 	LCUI_Pos selected;		// 被选中的地图块所在的坐标
@@ -30,7 +40,9 @@ typedef struct _MapBox_Data {
 	map_blocks_data **blocks;	// 地图中各个地图块数据
 	LCUI_Size mapblk_size;		// 地图块的尺寸
 	LCUI_Queue mapblk_img;		// 已记录的地图块图像
-} MapBox_Data ;
+	LCUI_Queue obj_img;		// 已记录的对象图像
+	LCUI_Widget **objs_widget;	// 已记录的用于显示地图对象的部件
+} MapBox_Data;
 
 /* 获取指定ID的地图块图像数据 */
 static MapBlockIMG *
@@ -140,7 +152,7 @@ static int MapBox_RedrawMapBlock( LCUI_Widget *widget, int row, int col )
 	Graph_Init( &buff );
 	Graph_Init( &border_img );
 	graph = Widget_GetSelfGraph( widget );
-	n = mapbox->blocks[row][col].id;
+	n = mapbox->blocks[row][col].blk_id;
 	pos = MapBox_MapBlock_GetPixelPos( widget, row, col );
 	mapblk_img = MapBox_GetMapBlockIMG( widget, n );
 	img_mapblock = &mapblk_img->img;
@@ -210,7 +222,7 @@ static void MapBox_ExecDraw( LCUI_Widget *widget )
 		for( j=0; j<mapbox->cols; ++j ) {
 			pos.x = (int)(x+0.5);
 			pos.y = (int)(y+0.5);
-			n = mapbox->blocks[i][j].id;
+			n = mapbox->blocks[i][j].blk_id;
 			/* 根据ID号来引用相应地图块的图像数据 */
 			mapblk_img = MapBox_GetMapBlockIMG( widget, n );
 			if( mapblk_img == NULL ) {
@@ -266,7 +278,7 @@ int MapBox_CreateMap( LCUI_Widget *widget, int rows, int cols )
 			return -1;
 		}
 		for(j=0; j<cols; ++j) {
-			mapbox->blocks[i][j].id = 0;
+			mapbox->blocks[i][j].blk_id = 0;
 			mapbox->blocks[i][j].verti_flip = FALSE;
 			mapbox->blocks[i][j].horiz_flip = FALSE;
 		}
@@ -301,7 +313,7 @@ int MapBox_ResizeMap( LCUI_Widget *widget, int rows, int cols, POSBOX_POS flag )
 			return -1;
 		}
 		for(j=0; j<cols; ++j) {
-			new_mapblocks[i][j].id = 0;
+			new_mapblocks[i][j].blk_id = 0;
 			new_mapblocks[i][j].verti_flip = FALSE;
 			new_mapblocks[i][j].horiz_flip = FALSE;
 		}
@@ -472,7 +484,7 @@ int MapBox_SetMapBlock(	LCUI_Widget *widget, int mapblock_id )
 	if( mapblock_id == -1 ) {
 		return -2;
 	}
-	mapbox->blocks[mapbox->selected.y][mapbox->selected.x].id = mapblock_id;
+	mapbox->blocks[mapbox->selected.y][mapbox->selected.x].blk_id = mapblock_id;
 	MapBox_RedrawMapBlock( widget, mapbox->selected.y, mapbox->selected.x );
 	return 0;
 }
@@ -530,13 +542,23 @@ int MapBox_LoadMapData( LCUI_Widget *widget, const char *mapdata_filepath )
 	MapBox_Data *mapbox;
 	mapfile_header map_info;
 	map_blocks_data **tmp, **new_mapblocks;
-	
+
 	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
 	fp = fopen( mapdata_filepath, "rb" );
 	if(fp == NULL) {
 		return -1;
 	}
 	fread( &map_info, sizeof(mapfile_header), 1, fp );
+	/* 如果文件头中没有“LCUIMAP”这个字符串就退出 */
+	if( strcmp( map_info.type, "LCUIMAP") != 0 ) {
+		fclose( fp );
+		return -1;
+	}
+	/* 如果文件版本不是当前支持的版本，也退出 */
+	if( map_info.version != MAPFILE_VERSION ) {
+		fclose( fp );
+		return -2;
+	}
 	new_mapblocks = (map_blocks_data**)malloc(map_info.rows
 					*sizeof(map_blocks_data*) );
 	if( !new_mapblocks ) {
@@ -582,8 +604,17 @@ int MapBox_SaveMapData( LCUI_Widget *widget, const char *mapdata_filepath )
 	int row, col;
 	MapBox_Data *mapbox;
 	mapfile_header map_info;
-	
+
 	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
+	map_info.type[0] = 'L';
+	map_info.type[1] = 'C';
+	map_info.type[2] = 'U';
+	map_info.type[3] = 'I';
+	map_info.type[4] = 'M';
+	map_info.type[5] = 'A';
+	map_info.type[6] = 'P';
+	map_info.type[7] = '\0';
+	map_info.version = MAPFILE_VERSION;
 	map_info.rows = mapbox->rows;
 	map_info.cols = mapbox->cols;
 	fp = fopen( mapdata_filepath, "wb" );

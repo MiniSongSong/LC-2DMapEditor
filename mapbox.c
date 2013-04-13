@@ -314,6 +314,7 @@ int MapBox_CreateMap( LCUI_Widget *widget, int rows, int cols )
 	mapbox->cols = cols;
 	/* 标记需要重绘 */
 	Widget_Draw( widget );
+	return 0;
 }
 
 /* 调整地图尺寸 */
@@ -546,6 +547,7 @@ void MapBox_SetCurrentMapBlock( LCUI_Widget *widget, int mapblock_id )
 	
 	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
 	mapbox->current_mapblock_id = mapblock_id;
+	MapBox_RedrawMapBlock( widget, mapbox->higlight.y,  mapbox->higlight.x );
 }
 
 /* 对已选中的地图块进行垂直翻转 */
@@ -603,23 +605,23 @@ int MapBox_LoadMapData( LCUI_Widget *widget, const char *mapdata_filepath )
 	/* 如果文件头中没有“LCUIMAP”这个字符串就退出 */
 	if( strcmp( map_info.type, "LCUIMAP") != 0 ) {
 		fclose( fp );
-		return -1;
+		return -2;
 	}
 	/* 如果文件版本不是当前支持的版本，也退出 */
 	if( map_info.version != MAPFILE_VERSION ) {
 		fclose( fp );
-		return -2;
+		return -3;
 	}
 	new_mapblocks = (map_blocks_data**)malloc(map_info.rows
 					*sizeof(map_blocks_data*) );
 	if( !new_mapblocks ) {
-		return -3;
+		return -4;
 	}
 	
 	new_objs_widget = (LCUI_Widget***)malloc(
 			 map_info.rows*sizeof(LCUI_Widget**) );
 	if( !new_objs_widget ) {
-		return -3;
+		return -4;
 	}
 	for( row=0; row<map_info.rows; ++row ) {
 		new_mapblocks[row] = (map_blocks_data*)malloc(
@@ -633,7 +635,7 @@ int MapBox_LoadMapData( LCUI_Widget *widget, const char *mapdata_filepath )
 			}
 			free( new_objs_widget );
 			free( new_mapblocks );
-			return -2;
+			return -4;
 		}
 		for( col=0; col<map_info.cols; ++col ) {
 			fread( &new_mapblocks[row][col],

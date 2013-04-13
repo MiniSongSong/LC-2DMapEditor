@@ -7,6 +7,7 @@
 #include LC_LABEL_H
 #include LC_BUTTON_H
 #include LC_TEXTBOX_H
+#include LC_INPUT_H
 #include LC_RES_H
 
 #include "mapbox.h"
@@ -24,7 +25,7 @@
 static LCUI_Graph wnd_icon, cursor_img, map_res, map_blocks[MAP_BLOCK_TOTAL];
 static LCUI_Graph img_btn_vertiflip, img_btn_horizflip, img_btn_save, img_btn_resize;
 
-static LCUI_Widget *window, *mapbox_window;
+static LCUI_Widget *window, *mapbox_window, *mapobj_window;
 static LCUI_Widget *btn[MAP_BLOCK_TOTAL+1], *mapbox;
 static LCUI_Widget *btn_vertiflip, *btn_horizflip, *btn_save, *btn_resize;
 
@@ -91,11 +92,21 @@ static void free_res(void)
 static void proc_mapbtn_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 {
 	int i;
-	for( i=1; i<MAP_BLOCK_TOTAL+1; ++i ) {
+	for( i=0; i<MAP_BLOCK_TOTAL; ++i ) {
 		if( btn[i] == widget ) {
-			MapBox_SetCurrentMapBlock( mapbox, i-1 );
+			MapBox_SetCurrentMapBlock( mapbox, i );
 			return;
 		}
+	}
+	MapBox_SetCurrentMapBlock( mapbox, -1 );
+}
+
+/* 响应鼠标右键，取消地图块/地图对象摆放 */
+static void 
+mapbox_proc_mousebutton( LCUI_Widget *widget, LCUI_WidgetEvent *event )
+{
+	if( event->mouse_button.button != LCUIKEY_RIGHTBUTTON ) {
+		return;
 	}
 	MapBox_SetCurrentMapBlock( mapbox, -1 );
 }
@@ -294,8 +305,50 @@ proc_btn_horizflip_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 	MapBox_MapBlock_HorizFlip( mapbox );
 }
 
+#ifdef USE_THIS_CODE
+#define MAP_OBJ_WIDTH	52
+#define MAP_OBJ_HEIGHT	43
+#define MAP_OBJ_TOTAL	6
+
+/* 初始化地图对象窗口 */
+static void mapobjbox_init(void)
+{
+	int i;
+	LCUI_Size size;
+	LCUI_Pos pos;
+
+	mapobj_window = Widget_New("window");
+	Window_SetTitleTextW( mapobj_window, L"地图对象" );
+	size.w = 2*MAP_OBJ_WIDTH+10;
+	size.h = (int)(MAP_OBJ_TOTAL/2.0+0.5)*MAP_OBJ_HEIGHT + 32;
+	Widget_Resize( mapbox_window, size );
+	Widget_Hide( Window_GetCloseButton(mapbox_window) );
+
+	pos.y = -MAP_OBJ_WIDTH;
+	for(i=0; i<MAP_OBJ_TOTAL+1; ++i) {
+		if( i%2==0 ) {
+			pos.x = 0;
+			pos.y += MAP_OBJ_WIDTH;
+		} else {
+			pos.x = MAP_OBJ_WIDTH;
+		}
+		btn[i] = Widget_New("button");
+		Window_ClientArea_Add( mapbox_window, btn[i] );
+		Widget_SetBackgroundImage( btn[i], &map_blocks[i-1] );
+		Widget_SetBackgroundLayout( btn[i], LAYOUT_CENTER );
+		Widget_SetAutoSize( btn[i], FALSE, 0 );
+		Widget_Resize( btn[i], Size(MAP_OBJ_WIDTH,MAP_OBJ_WIDTH) );
+		Widget_Move( btn[i], pos );
+		Widget_Event_Connect( btn[i], EVENT_CLICKED, proc_mapbtn_clicked );
+		Widget_Show( btn[i] );
+	}
+	Widget_SetZIndex( mapbox_window, 10 );
+	Widget_Show(mapbox_window);
+}
+#endif
+
 /* 初始化地图块窗口 */
-static void map_toolbox_init(void)
+static void mapblkbox_init(void)
 {
 	int i;
 	LCUI_Size size;
@@ -311,7 +364,7 @@ static void map_toolbox_init(void)
 	
 	/* 创建地图块按钮，并计算出相应的坐标 */
 	pos.y = -MAP_BLOCK_WIDTH;
-	for(i=0; i<MAP_BLOCK_TOTAL+1; ++i) {
+	for(i=0; i<MAP_BLOCK_TOTAL; ++i) {
 		if( i%2==0 ) {
 			pos.x = 0;
 			pos.y += MAP_BLOCK_WIDTH;
@@ -320,11 +373,7 @@ static void map_toolbox_init(void)
 		}
 		btn[i] = Widget_New("button");
 		Window_ClientArea_Add( mapbox_window, btn[i] );
-		if( i == 0 ) {
-			Widget_SetBackgroundImage( btn[i], &cursor_img );
-		} else {
-			Widget_SetBackgroundImage( btn[i], &map_blocks[i-1] );
-		}
+		Widget_SetBackgroundImage( btn[i], &map_blocks[i] );
 		Widget_SetBackgroundLayout( btn[i], LAYOUT_CENTER );
 		Widget_SetAutoSize( btn[i], FALSE, 0 );
 		Widget_Resize( btn[i], Size(MAP_BLOCK_WIDTH,MAP_BLOCK_WIDTH) );
@@ -414,19 +463,22 @@ static void mapbox_init(void)
 	Widget_Event_Connect( mapbox, EVENT_DRAG, proc_mapbox_drag );
 	/* 在地图框改变尺寸时，更新它在窗口内的位置 */
 	Widget_Event_Connect( mapbox, EVENT_RESIZE, update_mapbox_pos );
+	/* 响应鼠标右键点击 */
+	Widget_Event_Connect( mapbox, EVENT_MOUSEBUTTON, mapbox_proc_mousebutton );
+
 	i = MapBox_LoadMapData( mapbox, MAPFILE_PATH );
 	Widget_Show( mapbox );
 	switch( i ) {
-	case -2:
+	case -3:
 		LCUI_MessageBoxW( MB_ICON_ERROR,
 		 L"该版本的地图文件不被支持！",
 		 L"地图文件错误", MB_BTN_OK );
 		break;
-	case -1:
+	case -2:
 		LCUI_MessageBoxW( MB_ICON_ERROR,
 		 L"所载入的文件不是有效的地图文件！",
 		 L"地图文件错误", MB_BTN_OK );
-		break;
+	case -1: break;
 	case 0:
 		LCUI_MessageBoxW( MB_ICON_INFO,
 		 L"已经成功载入地图文件！",
@@ -493,7 +545,7 @@ int LCUIMainFunc( LCUI_ARGLIST )
 	load_res();
 	window_init();
 	Register_PosBox();
-	map_toolbox_init();
+	mapblkbox_init();
 	titebar_btn_init();
 	mapbox_init();
 	LCUIApp_AtQuit( free_res );

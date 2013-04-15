@@ -1,11 +1,11 @@
-#include <LCUI_Build.h>
+﻿#include <LCUI_Build.h>
 #include LC_LCUI_H
 #include LC_WIDGET_H
 #include LC_GRAPH_H
 #include "res_map.h"
 #include "mapbox.h"
 
-#define MAPFILE_VERSION	1
+#define MAPFILE_VERSION	2
 // 文件头信息
 typedef struct _mapfile_header {
 	char type[8];
@@ -15,10 +15,11 @@ typedef struct _mapfile_header {
 
 // 地图块
 typedef struct _map_blocks_data {
-	int blk_id;		// 地图块ID
-	int obj_id;		// 地图对象ID
-	LCUI_BOOL verti_flip;	// 是否垂直翻转
-	LCUI_BOOL horiz_flip;	// 是否水平翻转
+	int blk_id;			// 地图块ID
+	int obj_id;			// 地图对象ID
+	LCUI_BOOL blk_verti_flip;	// 地图块是否垂直翻转
+	LCUI_BOOL blk_horiz_flip;	// 地图块是否水平翻转
+	LCUI_BOOL obj_horiz_flip;	// 地图对象是否水平翻转
 } map_blocks_data;
 
 typedef struct _MapBlockIMG {
@@ -36,11 +37,12 @@ typedef struct _MapBox_Data {
 	int rows, cols;			// 记录地图行数与列数j
 	LCUI_Pos selected;		// 被选中的地图块所在的坐标
 	LCUI_Pos higlight;		// 被鼠标游标覆盖的地图块所在的坐标
-	int current_mapblock_id;	// 当前使用的地图块ID
+	int current_mapblk_id;		// 当前使用的地图块ID
+	int current_mapobj_id;		// 当前使用的地图对象ID
 	map_blocks_data **blocks;	// 地图中各个地图块数据
 	LCUI_Size mapblk_size;		// 地图块的尺寸
 	LCUI_Queue mapblk_img;		// 已记录的地图块图像
-	LCUI_Queue obj_img;		// 已记录的对象图像
+	LCUI_Queue mapobj_img;		// 已记录的对象图像
 	LCUI_Widget ***objs_widget;	// 已记录的用于显示地图对象的部件
 } MapBox_Data;
 
@@ -66,6 +68,27 @@ MapBox_GetMapBlockIMG( LCUI_Widget *widget, int id )
 	return NULL;
 }
 
+/* 获取指定ID的地图对象图像数据 */
+static MapObjIMG *
+MapBox_GetMapObjIMG( LCUI_Widget *widget, int id )
+{
+	int i, n;
+	MapBox_Data *mapbox;
+	MapObjIMG *ptr;
+
+	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
+	n = Queue_GetTotal( &mapbox->mapobj_img );
+	for(i=0; i<n; ++i) {
+		ptr = (MapObjIMG *)Queue_Get( &mapbox->mapobj_img, i );
+		if( ptr == NULL ) {
+			continue;
+		}
+		if( ptr->id == id ) {
+			return ptr;
+		}
+	}
+	return NULL;
+}
 /* 计算地图尺寸 */
 LCUI_Size MapBox_CountSize( LCUI_Widget *widget )
 {
@@ -156,11 +179,11 @@ static int MapBox_RedrawMapBlock( LCUI_Widget *widget, int row, int col )
 	pos = MapBox_MapBlock_GetPixelPos( widget, row, col );
 	mapblk_img = MapBox_GetMapBlockIMG( widget, n );
 	img_mapblock = &mapblk_img->img;
-	if( mapbox->blocks[row][col].horiz_flip ) {
+	if( mapbox->blocks[row][col].blk_horiz_flip ) {
 		Graph_HorizFlip( img_mapblock, &buff );
 		img_mapblock = &buff;
 	}
-	if( mapbox->blocks[row][col].verti_flip ) {
+	if( mapbox->blocks[row][col].blk_verti_flip ) {
 		Graph_VertiFlip( img_mapblock, &buff );
 		img_mapblock = &buff;
 	}
@@ -174,8 +197,8 @@ static int MapBox_RedrawMapBlock( LCUI_Widget *widget, int row, int col )
 	}
 	/* 如果有需要高亮地的图块 */
 	if( mapbox->higlight.x == col && mapbox->higlight.y == row ) {
-		if( mapbox->current_mapblock_id >= 0 ) {
-			n = mapbox->current_mapblock_id;
+		if( mapbox->current_mapblk_id >= 0 ) {
+			n = mapbox->current_mapblk_id;
 			mapblk_img = MapBox_GetMapBlockIMG( widget, n );
 			Graph_Mix( graph, &mapblk_img->img, pos );
 		}
@@ -190,6 +213,91 @@ static int MapBox_RedrawMapBlock( LCUI_Widget *widget, int row, int col )
 	/* 标记无效区域，以进行刷新 */
 	Widget_InvalidArea( widget, rect );
 	return 0;
+}
+
+/* 重绘指定坐标的地图对象 */
+static int MapBox_RedrawMapObj( LCUI_Widget *widget, int row, int col )
+{
+	int n;
+	LCUI_Pos pos;
+	LCUI_Size size;
+	MapBox_Data *mapbox;
+	MapObjIMG *mapobj_data;
+	LCUI_Widget *obj_widget;
+	LCUI_Graph *img_mapobj, buff;
+	
+	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
+	if( row < 0 || row >= mapbox->rows
+	|| col < 0 || col >= mapbox->cols ) {
+		return -1;
+	}
+
+	Graph_Init( &buff );
+	if( mapbox->higlight.x == col
+	 && mapbox->higlight.y == row
+	 && mapbox->current_mapobj_id >= 0 ) {
+		n = mapbox->current_mapobj_id;
+	} else {
+		n = mapbox->blocks[row][col].obj_id;
+	}
+	pos = MapBox_MapBlock_GetPixelPos( widget, row, col );
+	/* 如果该地图块上显示的对象ID有效 */
+	if( n >= 0 ) {
+		mapobj_data = MapBox_GetMapObjIMG( widget, n );
+		img_mapobj = &mapobj_data->img;
+		/* 处理水平翻转 */
+		if( mapbox->blocks[row][col].obj_horiz_flip ) {
+			Graph_HorizFlip( img_mapobj, &buff );
+		} else {
+			Graph_Copy( &buff, img_mapobj );
+		}
+		img_mapobj = &buff;
+		size = Graph_GetSize( img_mapobj );
+	} else {
+		img_mapobj = NULL;
+		size.w = size.h = 0;
+	}
+	obj_widget = mapbox->objs_widget[row][col];
+	/* 如果该坐标上还没有部件用于显示地图对象，则创建一个 */
+	if( obj_widget == NULL ) {
+		/* 对象ID无效，那就不创建了 */
+		if( n < 0 ) {
+			return 1;
+		}
+		obj_widget = Widget_New(NULL);
+		Widget_Container_Add( widget, obj_widget );
+		mapbox->objs_widget[row][col] = obj_widget;
+	}
+	Widget_Resize( obj_widget, size );
+	/* 如果该部件之前有背景图，则释放它 */
+	if( Graph_IsValid( &obj_widget->background.image ) ) {
+		Graph_Free( &obj_widget->background.image );
+	}
+	Widget_SetBackgroundImage( obj_widget, img_mapobj );
+	Widget_SetBackgroundLayout( obj_widget, LAYOUT_CENTER );
+	/* 计算部件的位置 */
+	pos.x += ((MAP_BLOCK_WIDTH-size.w)/2);
+	pos.y += (MAP_BLOCK_HEIGHT-size.h);
+	Widget_Move( obj_widget, pos );
+	/* 根据坐标来计算部件的z-index值 */
+	n = mapbox->rows * mapbox->cols + col;
+	/* 设置部件的堆叠顺序 */
+	Widget_SetZIndex( obj_widget, n );
+	Widget_Show( obj_widget );
+	return 0;
+}
+
+static void MapBox_RefreshObjIMG( LCUI_Widget *widget )
+{
+	int i, j;
+	MapBox_Data *mapbox;
+
+	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
+	for(i=0; i<mapbox->rows; ++i) {
+		for(j=0; j<mapbox->cols; ++j) {
+			MapBox_RedrawMapObj( widget, i, j );
+		}
+	}
 }
 
 static void MapBox_ExecDraw( LCUI_Widget *widget )
@@ -231,11 +339,11 @@ static void MapBox_ExecDraw( LCUI_Widget *widget )
 			}
 			img_mapblock = &mapblk_img->img;
 			/* 如果需要进行翻转，则再对地图块进行翻转处理 */
-			if( mapbox->blocks[i][j].horiz_flip ) {
+			if( mapbox->blocks[i][j].blk_horiz_flip ) {
 				Graph_HorizFlip( img_mapblock, &buff );
 				img_mapblock = &buff;
 			}
-			if( mapbox->blocks[i][j].verti_flip ) {
+			if( mapbox->blocks[i][j].blk_verti_flip ) {
 				Graph_VertiFlip( img_mapblock, &buff );
 				img_mapblock = &buff;
 			}
@@ -291,8 +399,9 @@ int MapBox_CreateMap( LCUI_Widget *widget, int rows, int cols )
 			new_objs_widget[i][j] = NULL;
 			new_mapblocks[i][j].blk_id = 0;
 			new_mapblocks[i][j].obj_id = -1;
-			new_mapblocks[i][j].verti_flip = FALSE;
-			new_mapblocks[i][j].horiz_flip = FALSE;
+			new_mapblocks[i][j].blk_verti_flip = FALSE;
+			new_mapblocks[i][j].blk_horiz_flip = FALSE;
+			new_mapblocks[i][j].obj_horiz_flip = FALSE;
 		}
 	}
 
@@ -356,8 +465,9 @@ int MapBox_ResizeMap( LCUI_Widget *widget, int rows, int cols, POSBOX_POS flag )
 			new_objs_widget[i][j] = NULL;
 			new_mapblocks[i][j].blk_id = 0;
 			new_mapblocks[i][j].obj_id = -1;
-			new_mapblocks[i][j].verti_flip = FALSE;
-			new_mapblocks[i][j].horiz_flip = FALSE;
+			new_mapblocks[i][j].blk_verti_flip = FALSE;
+			new_mapblocks[i][j].blk_horiz_flip = FALSE;
+			new_mapblocks[i][j].obj_horiz_flip = FALSE;
 		}
 	}
 
@@ -458,11 +568,13 @@ int MapBox_HiglightMapBlock( LCUI_Widget *widget, LCUI_Pos pos )
 	/* 如果之前已经有地图块被选中，则重绘该地图块 */
 	if( tmp_pos.x != -1 && tmp_pos.y != -1 ) {
 		MapBox_RedrawMapBlock( widget, tmp_pos.y, tmp_pos.x );
+		MapBox_RedrawMapObj( widget, tmp_pos.y, tmp_pos.x );
 	}
 	if( pos.x == -1 || pos.y  == -1 ) {
 		return -1;
 	}
 	MapBox_RedrawMapBlock( widget, pos.y, pos.x );
+	MapBox_RedrawMapObj( widget, pos.y, pos.x );
 	return 0;
 }
 
@@ -504,20 +616,46 @@ int MapBox_SetMapBlockIMG( LCUI_Widget *widget, int id, LCUI_Graph *mapblk_img )
 {
 	MapBlockIMG *img;
 	MapBox_Data *mapbox;
+	/* 查找是否有已经存在的 */
 	img = MapBox_GetMapBlockIMG( widget, id );
-	mapbox = (MapBox_Data*)Widget_GetPrivData( widget );
+	/* 如果没有，则新增 */
 	if( img == NULL ) {
 		img = (MapBlockIMG*)malloc( sizeof(MapBlockIMG) );
 		if( img == NULL ) {
 			return -1;
 		}
 		img->id = id;
+		mapbox = (MapBox_Data*)Widget_GetPrivData( widget );
 		Queue_AddPointer( &mapbox->mapblk_img, img );
 	}
+	/* 然后记录图像 */
 	if( mapblk_img == NULL ) {
 		Graph_Init( &img->img );
 	} else {
 		img->img = *mapblk_img;
+	}
+	return 0;
+}
+
+/* 设定指定ID的地图对象的图像 */
+int MapBox_SetMapObjIMG( LCUI_Widget *widget, int id, LCUI_Graph *mapobj_img )
+{
+	MapObjIMG *img;
+	MapBox_Data *mapbox;
+	img = MapBox_GetMapObjIMG( widget, id );
+	mapbox = (MapBox_Data*)Widget_GetPrivData( widget );
+	if( img == NULL ) {
+		img = (MapObjIMG*)malloc( sizeof(MapBlockIMG) );
+		if( img == NULL ) {
+			return -1;
+		}
+		img->id = id;
+		Queue_AddPointer( &mapbox->mapobj_img, img );
+	}
+	if( mapobj_img == NULL ) {
+		Graph_Init( &img->img );
+	} else {
+		img->img = *mapobj_img;
 	}
 	return 0;
 }
@@ -540,15 +678,44 @@ int MapBox_SetMapBlock(	LCUI_Widget *widget, int mapblock_id )
 	return 0;
 }
 
+/* 设定已选定的地图块上的地图对象所使用的ID */
+int MapBox_SetMapObj(	LCUI_Widget *widget, int mapobj_id )
+{
+	MapBox_Data *mapbox;
+	
+	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
+	if( mapbox->selected.x == -1 || mapbox->selected.x >= mapbox->cols
+	|| mapbox->selected.y == -1 || mapbox->selected.y >= mapbox->rows ) {
+		return -1;
+	}
+	if( mapobj_id == -1 ) {
+		return -2;
+	}
+	mapbox->blocks[mapbox->selected.y][mapbox->selected.x].obj_id = mapobj_id;
+	MapBox_RedrawMapObj( widget, mapbox->selected.y, mapbox->selected.x );
+	return 0;
+}
+
 /* 设定当前使用的地图块 */
 void MapBox_SetCurrentMapBlock( LCUI_Widget *widget, int mapblock_id )
 {
 	MapBox_Data *mapbox;
 	
 	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
-	mapbox->current_mapblock_id = mapblock_id;
+	mapbox->current_mapblk_id = mapblock_id;
 	MapBox_RedrawMapBlock( widget, mapbox->higlight.y,  mapbox->higlight.x );
 }
+
+/* 设定当前使用的地图对象 */
+void MapBox_SetCurrentMapObj( LCUI_Widget *widget, int mapobj_id )
+{
+	MapBox_Data *mapbox;
+	
+	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
+	mapbox->current_mapobj_id = mapobj_id;
+	MapBox_RedrawMapObj( widget, mapbox->higlight.y,  mapbox->higlight.x );
+}
+
 
 /* 对已选中的地图块进行垂直翻转 */
 int MapBox_MapBlock_VertiFlip( LCUI_Widget *widget )
@@ -563,7 +730,7 @@ int MapBox_MapBlock_VertiFlip( LCUI_Widget *widget )
 	|| row == -1 || row >= mapbox->rows ) {
 		return -1;
 	}
-	mapbox->blocks[row][col].verti_flip = (!mapbox->blocks[row][col].verti_flip);
+	mapbox->blocks[row][col].blk_verti_flip = (!mapbox->blocks[row][col].blk_verti_flip);
 	MapBox_RedrawMapBlock( widget, row, col );
 	return 0;
 }
@@ -581,7 +748,7 @@ int MapBox_MapBlock_HorizFlip( LCUI_Widget *widget )
 	|| row == -1 || row >= mapbox->rows ) {
 		return -1;
 	}
-	mapbox->blocks[row][col].horiz_flip = (!mapbox->blocks[row][col].horiz_flip);
+	mapbox->blocks[row][col].blk_horiz_flip = (!mapbox->blocks[row][col].blk_horiz_flip);
 	MapBox_RedrawMapBlock( widget, row, col );
 	return 0;
 }
@@ -640,6 +807,7 @@ int MapBox_LoadMapData( LCUI_Widget *widget, const char *mapdata_filepath )
 		for( col=0; col<map_info.cols; ++col ) {
 			fread( &new_mapblocks[row][col],
 			 sizeof(map_blocks_data), 1, fp );
+			 new_objs_widget[row][col] = NULL;
 		}
 	}
 	fclose( fp );
@@ -659,7 +827,8 @@ int MapBox_LoadMapData( LCUI_Widget *widget, const char *mapdata_filepath )
 	}
 	mapbox->rows = map_info.rows;
 	mapbox->cols = map_info.cols;
-	Widget_Draw(widget);
+	Widget_Draw( widget );
+	MapBox_RefreshObjIMG( widget);
 	return 0;
 }
 
@@ -699,30 +868,27 @@ int MapBox_SaveMapData( LCUI_Widget *widget, const char *mapdata_filepath )
 }
 
 /* 处理鼠标移动事件 */
-static void MapBox_ProcMouseMotionEvent( LCUI_MouseMotionEvent *event, void *arg )
+static void 
+MapBox_ProcMouseMotionEvent( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 {
-	LCUI_Pos pos, pixel_pos;
-	LCUI_Widget *widget;
+	LCUI_Pos pos;
 
-	widget = (LCUI_Widget*)arg;
-	pixel_pos = Widget_GetGlobalPos( widget );
-	/* 用鼠标游标的坐标减去部件的全局坐标 */
-	pixel_pos.x = event->x - pixel_pos.x;
-	pixel_pos.y = event->y - pixel_pos.y;
-	DEBUG_MSG("cursor pixel pos: %d, %d\n", pixel_pos.x, pixel_pos.y);
-	pos = MapBox_MapBlock_GetPos( widget, pixel_pos );
+	DEBUG_MSG("relative pixel pos: %d, %d\n", pos.x, pos.y);
+	pos = MapBox_MapBlock_GetPos( widget, event->mouse_motion.rel_pos );
 	DEBUG_MSG("mapblock pos: %d, %d\n", pos.x, pos.y);
-	/* 选中地图块 */
+	/* 高亮指定地图块 */
 	MapBox_HiglightMapBlock( widget, pos );
 }
 
-static void MapBox_ProcClickedEvent( LCUI_Widget *widget, LCUI_WidgetEvent *event )
+static void 
+MapBox_ProcClickedEvent( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 {
 	MapBox_Data *mapbox;
 
 	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
 	MapBox_SelectMapBlock( widget, mapbox->higlight );
-	MapBox_SetMapBlock( widget, mapbox->current_mapblock_id );
+	MapBox_SetMapBlock( widget, mapbox->current_mapblk_id );
+	MapBox_SetMapObj( widget, mapbox->current_mapobj_id );
 }
 
 /* MapBox部件的析构函数 */
@@ -750,12 +916,13 @@ static void MapBox_ExecInit( LCUI_Widget *widget )
 	mapbox->higlight.x = mapbox->higlight.y = -1;
 	mapbox->blocks = NULL;
 	mapbox->objs_widget = NULL;
-	mapbox->current_mapblock_id = -1;
+	mapbox->current_mapblk_id = -1;
+	mapbox->current_mapobj_id = -1;
 	mapbox->mapblk_size = Size(0,0);
 	Queue_Init( &mapbox->mapblk_img, sizeof(MapBlockIMG), NULL );
-
+	Queue_Init( &mapbox->mapobj_img, sizeof(MapObjIMG), NULL );
 	/* 关联鼠标移动事件,点击事件，以及拖动事件 */
-	LCUI_MouseMotionEvent_Connect( MapBox_ProcMouseMotionEvent, widget );
+	Widget_Event_Connect( widget, EVENT_MOUSEMOTION, MapBox_ProcMouseMotionEvent );
 	Widget_Event_Connect( widget, EVENT_CLICKED, MapBox_ProcClickedEvent );
 	Widget_SetBackgroundColor( widget, RGB(195,195,195) );
 	Widget_SetBackgroundTransparent( widget, FALSE );

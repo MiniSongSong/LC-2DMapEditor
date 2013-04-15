@@ -33,11 +33,17 @@ void MapBox_SetMapBlockSize( LCUI_Widget *widget, int width, int height );
 /* 设定指定ID的地图块的图像 */
 int MapBox_SetMapBlockIMG( LCUI_Widget *widget, int id, LCUI_Graph *mapblk_img );
 
+/* 设定指定ID的地图对象的图像 */
+int MapBox_SetMapObjIMG( LCUI_Widget *widget, int id, LCUI_Graph *mapobj_img );
+
 /* 设定已选定的地图块所使用的ID */
 int MapBox_SetMapBlock(	LCUI_Widget *widget, int mapblock_id );
 
 /* 设定当前使用的地图块 */
 void MapBox_SetCurrentMapBlock( LCUI_Widget *widget, int mapblock_id );
+
+/* 设定当前使用的地图对象 */
+void MapBox_SetCurrentMapObj( LCUI_Widget *widget, int mapobj_id );
 
 /* 对已选中的地图块进行垂直翻转 */
 int MapBox_MapBlock_VertiFlip( LCUI_Widget *widget );

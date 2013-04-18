@@ -120,6 +120,7 @@ proc_mapbtn_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 	for( i=0; i<MAP_BLOCK_TOTAL; ++i ) {
 		if( btn[i] == widget ) {
 			MapBox_SetCurrentMapBlock( mapbox, i );
+			MapBox_SetCurrentMapObj( mapbox, -1 );
 			return;
 		}
 	}
@@ -134,6 +135,7 @@ proc_objbtn_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 	for( i=0; i<MAP_OBJ_TOTAL; ++i ) {
 		if( obj_btn[i] == widget ) {
 			MapBox_SetCurrentMapObj( mapbox, i );
+			MapBox_SetCurrentMapBlock( mapbox, -1 );
 			return;
 		}
 	}
@@ -526,6 +528,7 @@ static void mapbox_init(void)
 	}
 }
 
+
 /* 初始化主窗口标题栏内的按钮 */
 static void titebar_btn_init(void)
 {
@@ -580,7 +583,6 @@ int LCUIMainFunc( LCUI_ARGLIST )
 	InitConsoleWindow();
 	//setenv( "LCUI_FONTFILE", "../../fonts/msyh.ttf", FALSE );
 	LCUI_Init(LCUI_DEFAULT_CONFIG);
-	_DEBUG_MSG("id: %lu\n", LCUIThread_SelfID());
 	load_res();
 	window_init();
 	Register_PosBox();

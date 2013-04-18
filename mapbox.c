@@ -4,6 +4,7 @@
 #include LC_GRAPH_H
 #include "res_map.h"
 #include "mapbox.h"
+#include <math.h>
 
 #define MAPFILE_VERSION	2
 // 文件头信息
@@ -123,38 +124,76 @@ LCUI_Pos MapBox_MapBlock_GetPixelPos( LCUI_Widget *widget, int row, int col )
 	return pixel_pos;
 }
 
+/* 计算两点之间的距离 */
+static double 
+get_point_distance( LCUI_Pos pt1, LCUI_Pos pt2 )
+{
+	return sqrt(pow((double)(pt1.x-pt2.x), 2) + pow((double)(pt1.y-pt2.y), 2));
+}
+
+
 /* 获取指定像素坐标上的地图块的坐标 */
 LCUI_Pos MapBox_MapBlock_GetPos( LCUI_Widget *widget, LCUI_Pos pixel_pos )
 {
-	int i, j;
-	LCUI_Rect rect;
+	int y_axis_x;
+	double k, x, y, d, px, py;
+	LCUI_Pos pos;
 	LCUI_Size map_size;
 	MapBox_Data *mapbox;
-	double start_x, start_y, x, y;
 
 	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
 	map_size = MapBox_CountSize( widget );
-	start_x = (mapbox->rows-1)*mapbox->mapblk_size.w/2.0;
-	start_y = 0;
-	for( i=0; i<mapbox->rows; ++i ) {
-		x = start_x;
-		y = start_y;
-		for( j=0; j<mapbox->cols; ++j ) {
-			rect.x = (int)(x+0.5);
-			rect.y = (int)(y+0.5);
-			rect.width = mapbox->mapblk_size.w;
-			rect.height = mapbox->mapblk_size.h;
-			/* 如果该像素点在当前地图块的范围内 */
-			if( LCUIRect_IncludePoint( pixel_pos, rect ) ) {
-				return Pos(j, i);
-			}
-			x += (mapbox->mapblk_size.w/2.0);
-			y += (mapbox->mapblk_size.h/2.0);
-		}
-		start_x -= (mapbox->mapblk_size.w/2.0);
-		start_y += (mapbox->mapblk_size.h/2.0);
+	if(pixel_pos.x < 0 || pixel_pos.y < 0
+	 || pixel_pos.x >= map_size.w || pixel_pos.y >= map_size.h ) {
+		return Pos(-1, -1);
 	}
-	return Pos(-1, -1);
+	/* **************************************************
+	 * 坐标系的x轴平分矩形，y轴平分地图左上角第一个地图块，
+	 * 传入的坐标是以MapBox部件的左上角为原点，需要转换坐标
+	 * **************************************************/
+	/* 计算出Y轴的X轴坐标 */
+	y_axis_x = (int)(mapbox->rows*mapbox->mapblk_size.w*0.5);
+	pixel_pos.x = pixel_pos.x - y_axis_x;
+	/* X轴的Y轴坐标就是map_size.h*0.5 */
+	pixel_pos.y = (int)(map_size.h*0.5 - pixel_pos.y);
+	/* 先计算出平行四边形的“左”边线所在直线的斜率k */
+	k = -map_size.h * 1.0 / map_size.w;
+	/* 计算出该点所在直线与“左”边线的交点坐标 */
+	d = pixel_pos.y - k * pixel_pos.x;
+	x = (d - map_size.h*0.5)/(-2*k);
+	y = k*x + d;
+	pos.y = (int)y;
+	pos.x = (int)x;
+	/* 如果该点不在左边线的右下方 */
+	if( pixel_pos.x < pos.x || pixel_pos.y > pos.y ) {
+		pos.x = pos.y = -1;
+		return pos;
+	}
+	/* 该点与交点的距离就是地图坐标系中的X轴坐标 */
+	px = get_point_distance( pos, pixel_pos );
+	
+	/* 计算出该点所在直线与“右”边的交点坐标 */
+	d = pixel_pos.y + k * pixel_pos.x;
+	x = (d - map_size.h*0.5)/(2*k);
+	y = -k*x + d;
+	pos.y = (int)y;
+	pos.x = (int)x;
+	/* 如果该点不在上边线的左下方 */
+	if( pixel_pos.x > pos.x || pixel_pos.y > pos.y ) {
+		pos.x = pos.y = -1;
+		return pos;
+	}
+	/* 得出地图坐标系中的Y轴坐标 */
+	py = get_point_distance( pos, pixel_pos );
+
+	/* 计算出地图块在地图坐标系的xy轴跨距 */
+	d = sqrt( pow(mapbox->mapblk_size.w*0.5, 2)
+		 + pow(mapbox->mapblk_size.h*0.5, 2) );
+
+	/* 得出以地图块为单位距离的坐标 */
+	pos.y = (int)(py / d);
+	pos.x = (int)(px / d);
+	return pos;
 }
 
 /* 重绘地图块 */

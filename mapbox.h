@@ -34,7 +34,8 @@ void MapBox_SetMapBlockSize( LCUI_Widget *widget, int width, int height );
 int MapBox_SetMapBlockIMG( LCUI_Widget *widget, int id, LCUI_Graph *mapblk_img );
 
 /* 设定指定ID的地图对象的图像 */
-int MapBox_SetMapObjIMG( LCUI_Widget *widget, int id, LCUI_Graph *mapobj_img );
+int MapBox_SetMapObjIMG(	LCUI_Widget *widget, int id,
+				LCUI_Graph *mapobj_img, LCUI_Pos offset );
 
 /* 设定已选定的地图块所使用的ID */
 int MapBox_SetMapBlock(	LCUI_Widget *widget, int mapblock_id );

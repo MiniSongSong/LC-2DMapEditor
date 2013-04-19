@@ -487,6 +487,10 @@ static void proc_mapbox_drag( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 static void mapbox_init(void)
 {
 	int i;
+	LCUI_Pos offset[MAP_OBJ_TOTAL]={
+		{-1,-5},{0,0},{0,-3},{0,0},{0,0},{0,0}
+	};
+	
 	Register_MapBox();
 	mapbox = Widget_New("mapbox");
 	Window_ClientArea_Add( window, mapbox );
@@ -498,7 +502,7 @@ static void mapbox_init(void)
 	}
 	/* 设置MapBox部件的地图对象 */
 	for(i=0; i<MAP_OBJ_TOTAL; ++i) {
-		MapBox_SetMapObjIMG( mapbox, i, &map_objs[i] );
+		MapBox_SetMapObjIMG( mapbox, i, &map_objs[i], offset[i] );
 	}
 	MapBox_CreateMap( mapbox, 4, 4 );
 	Widget_Event_Connect( mapbox, EVENT_DRAG, proc_mapbox_drag );

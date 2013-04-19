@@ -32,6 +32,7 @@ typedef struct _MapObjIMG {
 	int id;				// 对象的ID
 	LCUI_Graph img;			// 对象的图像数据
 	LCUI_Size occupied_size;	// 占用的地图空间尺寸
+	LCUI_Pos offset;		// xy坐标偏移量
 } MapObjIMG;
 
 typedef struct _MapBox_Data {
@@ -256,7 +257,7 @@ static int MapBox_RedrawMapBlock( LCUI_Widget *widget, int row, int col )
 static int MapBox_RedrawMapObj( LCUI_Widget *widget, int row, int col )
 {
 	int n;
-	LCUI_Pos pos;
+	LCUI_Pos pos, offset;
 	LCUI_Size size;
 	MapBox_Data *mapbox;
 	MapObjIMG *mapobj_data;
@@ -268,7 +269,7 @@ static int MapBox_RedrawMapObj( LCUI_Widget *widget, int row, int col )
 	|| col < 0 || col >= mapbox->cols ) {
 		return -1;
 	}
-
+	
 	Graph_Init( &buff );
 	if( mapbox->higlight.x == col
 	 && mapbox->higlight.y == row
@@ -282,6 +283,7 @@ static int MapBox_RedrawMapObj( LCUI_Widget *widget, int row, int col )
 	if( n >= 0 ) {
 		mapobj_data = MapBox_GetMapObjIMG( widget, n );
 		img_mapobj = &mapobj_data->img;
+		offset = mapobj_data->offset;
 		/* 处理水平翻转 */
 		if( mapbox->blocks[row][col].obj_horiz_flip ) {
 			Graph_HorizFlip( img_mapobj, &buff );
@@ -293,6 +295,7 @@ static int MapBox_RedrawMapObj( LCUI_Widget *widget, int row, int col )
 	} else {
 		img_mapobj = NULL;
 		size.w = size.h = 0;
+		offset.x = offset.y = 0;
 	}
 	obj_widget = mapbox->objs_widget[row][col];
 	/* 如果该坐标上还没有部件用于显示地图对象，则创建一个 */
@@ -315,6 +318,8 @@ static int MapBox_RedrawMapObj( LCUI_Widget *widget, int row, int col )
 	/* 计算部件的位置 */
 	pos.x += ((MAP_BLOCK_WIDTH-size.w)/2);
 	pos.y += (MAP_BLOCK_HEIGHT-size.h);
+	pos.x += offset.x;
+	pos.y += offset.y;
 	Widget_Move( obj_widget, pos );
 	/* 根据坐标来计算部件的z-index值 */
 	n = mapbox->rows * mapbox->cols + col;
@@ -677,24 +682,30 @@ int MapBox_SetMapBlockIMG( LCUI_Widget *widget, int id, LCUI_Graph *mapblk_img )
 }
 
 /* 设定指定ID的地图对象的图像 */
-int MapBox_SetMapObjIMG( LCUI_Widget *widget, int id, LCUI_Graph *mapobj_img )
+int MapBox_SetMapObjIMG(	LCUI_Widget *widget, int id,
+				LCUI_Graph *mapobj_img, LCUI_Pos offset )
 {
-	MapObjIMG *img;
+	MapObjIMG *img, buff;
 	MapBox_Data *mapbox;
+	
 	img = MapBox_GetMapObjIMG( widget, id );
 	mapbox = (MapBox_Data*)Widget_GetPrivData( widget );
 	if( img == NULL ) {
-		img = (MapObjIMG*)malloc( sizeof(MapBlockIMG) );
-		if( img == NULL ) {
-			return -1;
+		buff.id = id;
+		buff.offset = offset;
+		if( mapobj_img == NULL ) {
+			Graph_Init( &buff.img );
+		} else {
+			buff.img = *mapobj_img;
 		}
-		img->id = id;
-		Queue_AddPointer( &mapbox->mapobj_img, img );
-	}
-	if( mapobj_img == NULL ) {
-		Graph_Init( &img->img );
+		Queue_Add( &mapbox->mapobj_img, &buff );
 	} else {
-		img->img = *mapobj_img;
+		img->offset = offset;
+		if( mapobj_img == NULL ) {
+			Graph_Init( &img->img );
+		} else {
+			img->img = *mapobj_img;
+		}
 	}
 	return 0;
 }

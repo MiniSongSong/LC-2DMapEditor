@@ -108,11 +108,9 @@ LCUI_Pos MapBox_MapBlock_GetPixelPos( LCUI_Widget *widget, int row, int col )
 {
 	double x, y;
 	LCUI_Pos pixel_pos;
-	LCUI_Size map_size;
 	MapBox_Data *mapbox;
 
 	mapbox = (MapBox_Data *)Widget_GetPrivData( widget );
-	map_size = MapBox_CountSize( widget );
 	/* 计算像素坐标，和MapBox_ExecDraw函数中的计算方法基本一样 */
 	x = (mapbox->rows-1)*mapbox->mapblk_size.w/2.0;
 	x -= (mapbox->mapblk_size.w*row/2.0);
@@ -579,6 +577,8 @@ int MapBox_ResizeMap( LCUI_Widget *widget, int rows, int cols, POSBOX_POS flag )
 	mapbox->cols = cols;
 	/* 标记需要重绘 */
 	Widget_Draw( widget );
+	/* 刷新地图对象的坐标 */
+	MapBox_RefreshObjIMG( widget );
 	return 0;
 }
 
@@ -796,7 +796,7 @@ int MapBox_MapBlock_HorizFlip( LCUI_Widget *widget )
 int MapBox_LoadMapData( LCUI_Widget *widget, const char *mapdata_filepath )
 {
 	FILE *fp;
-	int row, col;
+	int row, col, n;
 	MapBox_Data *mapbox;
 	mapfile_header map_info;
 	LCUI_Widget ***tmp_objs_widget, ***new_objs_widget;
@@ -807,7 +807,10 @@ int MapBox_LoadMapData( LCUI_Widget *widget, const char *mapdata_filepath )
 	if(fp == NULL) {
 		return -1;
 	}
-	fread( &map_info, sizeof(mapfile_header), 1, fp );
+	n = fread( &map_info, sizeof(mapfile_header), 1, fp );
+	if( n < 1) {
+		return -2;
+	}
 	/* 如果文件头中没有“LCUIMAP”这个字符串就退出 */
 	if( strcmp( map_info.type, "LCUIMAP") != 0 ) {
 		fclose( fp );
@@ -835,22 +838,30 @@ int MapBox_LoadMapData( LCUI_Widget *widget, const char *mapdata_filepath )
 		new_objs_widget[row] = (LCUI_Widget**)malloc(
 				map_info.cols*sizeof(LCUI_Widget*) );
 		if( !new_mapblocks[row] || !new_objs_widget[row] ) {
-			for(row=row-1; row>=0; --row) {
-				free( new_objs_widget[row] );
-				free( new_mapblocks[row] );
-			}
-			free( new_objs_widget );
-			free( new_mapblocks );
-			return -4;
+			goto error_return;
 		}
 		for( col=0; col<map_info.cols; ++col ) {
-			fread( &new_mapblocks[row][col],
-			 sizeof(map_blocks_data), 1, fp );
-			 new_objs_widget[row][col] = NULL;
+			n = fread( &new_mapblocks[row][col],
+			sizeof(map_blocks_data), 1, fp );
+			if( n < 1 ) {
+				++row;
+				++col;
+				goto error_return;
+			}
+			new_objs_widget[row][col] = NULL;
 		}
 	}
 	fclose( fp );
-
+	goto no_error;
+error_return:;
+	for(row=row-1; row>=0; --row) {
+		free( new_objs_widget[row] );
+		free( new_mapblocks[row] );
+	}
+	free( new_objs_widget );
+	free( new_mapblocks );
+	return -4;
+no_error:;
 	tmp_mapblocks = mapbox->blocks;
 	tmp_objs_widget = mapbox->objs_widget;
 	mapbox->blocks = new_mapblocks;

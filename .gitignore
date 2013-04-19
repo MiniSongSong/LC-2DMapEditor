@@ -15,3 +15,16 @@
 *.exe
 *.out
 *.app
+
+.directory
+*.lo
+.deps
+.libs
+*.la
+Makefile
+autom4te.cache
+lcui.pc
+libtool
+config.log
+config.status
+stamp-h1

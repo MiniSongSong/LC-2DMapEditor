@@ -293,9 +293,10 @@ static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *even
 	TextBox_Text_SetMaxLength( tb_cols, 3 );
 
 	map_size = MapBox_GetMapSize( mapbox );
-	wsprintf( text_rows, L"%d", map_size.h );
-	wsprintf( text_cols, L"%d", map_size.w );
-	wsprintf( text, L"当前大小：%d x %d", map_size.w,map_size.h );
+	
+	swprintf( text_rows, 10, L"%d", map_size.h );
+	swprintf( text_cols, 10, L"%d", map_size.w );
+	swprintf( text, 32, L"当前大小：%d x %d", map_size.w,map_size.h );
 	Label_TextW( label_oldsize, text );
 	TextBox_TextW( tb_rows, text_rows );
 	TextBox_TextW( tb_cols, text_cols );
@@ -580,8 +581,10 @@ static void titebar_btn_init(void)
 
 int LCUIMainFunc( LCUI_ARGLIST )
 {
+#ifdef LCUI_BUILD_IN_WIN32
 	InitConsoleWindow();
-	//setenv( "LCUI_FONTFILE", "../../fonts/msyh.ttf", FALSE );
+#endif
+	setenv( "LCUI_FONTFILE", "/usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-R.ttf", FALSE );
 	LCUI_Init(LCUI_DEFAULT_CONFIG);
 	load_res();
 	window_init();

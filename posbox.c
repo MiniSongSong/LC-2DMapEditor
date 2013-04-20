@@ -229,7 +229,7 @@ static void PosBox_ExecUpdate( LCUI_Widget *widget )
 			if(j>=start.x && j<w && i >= start.y && i<h) {
 				Widget_SetBackgroundImage( 
 				posbox->btn[i][j], &posbox->img[row][col] );
-				_DEBUG_MSG("posbox->btn[%d][%d]: %p, row=%d, col=%d\n",
+				DEBUG_MSG("posbox->btn[%d][%d]: %p, row=%d, col=%d\n",
 				 i, j, posbox->btn[i][j], row, col);
 				++col;
 				continue;

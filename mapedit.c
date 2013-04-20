@@ -20,6 +20,7 @@
 #define IMG_PATH_BTN_HORIZ	"drawable/btn_horizflip.png"
 #define IMG_PATH_BTN_SAVE	"drawable/btn_save.png"
 #define IMG_PATH_BTN_RESIZE	"drawable/btn_resize.png"
+#define IME_PATH_BTN_DEL	"drawable/btn_del.png"
 #define MAPFILE_PATH		"map.dat"
 
 #define MAP_OBJ_WIDTH	52
@@ -29,11 +30,11 @@
 
 static LCUI_Graph wnd_icon, map_res, obj_res;
 static LCUI_Graph map_blocks[MAP_BLOCK_TOTAL], map_objs[MAP_OBJ_TOTAL];
-static LCUI_Graph img_btn_vertiflip, img_btn_horizflip, img_btn_save, img_btn_resize;
+static LCUI_Graph img_btn_del, img_btn_vertiflip, img_btn_horizflip, img_btn_save, img_btn_resize;
 
 static LCUI_Widget *window, *mapbox_window, *mapobj_window;
 static LCUI_Widget *btn[MAP_BLOCK_TOTAL], *obj_btn[MAP_OBJ_TOTAL], *mapbox;
-static LCUI_Widget *btn_vertiflip, *btn_horizflip, *btn_save, *btn_resize;
+static LCUI_Widget *btn_save, *btn_resize;
 
 #ifdef LCUI_BUILD_IN_WIN32
 #include <io.h>
@@ -54,6 +55,7 @@ static void InitConsoleWindow(void)
 }
 #endif
 
+/* 载入图像资源 */
 static void load_res(void)
 {
 	int i;
@@ -62,7 +64,7 @@ static void load_res(void)
 		{0,0,42,28},{87,0,52,43},{167,0,22,35},
 		{0,28,53,40},{128,35,51,33},{98,81,43,38}
 	};
-
+	/* 初始化 */
 	Graph_Init( &wnd_icon );
 	Graph_Init( &map_res );
 	Graph_Init( &obj_res );
@@ -70,11 +72,14 @@ static void load_res(void)
 	Graph_Init( &img_btn_vertiflip );
 	Graph_Init( &img_btn_resize );
 	Graph_Init( &img_btn_save );
+	Graph_Init( &img_btn_del );
+	/* 从文件中载入图像数据 */
 	Load_Image( IMG_PATH_BTN_HORIZ, &img_btn_horizflip );
 	Load_Image( IMG_PATH_BTN_VERTI, &img_btn_vertiflip );
 	Load_Image( IMG_PATH_ICON, &wnd_icon );
 	Load_Image( IMG_PATH_BTN_RESIZE, &img_btn_resize );
 	Load_Image( IMG_PATH_BTN_SAVE, &img_btn_save );
+	Load_Image( IME_PATH_BTN_DEL, &img_btn_del );
 	/* 载入地图图块资源 */
 	i = Load_Image( IMG_PATH_MAP, &map_res );
 	if( i != 0 ) {
@@ -102,6 +107,7 @@ static void load_res(void)
 	}
 }
 
+/* 释放载入的图像资源 */
 static void free_res(void)
 {
 	Graph_Free( &wnd_icon );
@@ -111,8 +117,167 @@ static void free_res(void)
 	Graph_Free( &img_btn_vertiflip );
 	Graph_Free( &img_btn_save );
 	Graph_Free( &img_btn_resize );
+	Graph_Free( &img_btn_del );
 }
 
+
+/*----------------------- 地图对象/地图块编辑按钮 --------------------------*/
+static LCUI_Widget *editbtn_del, *editbtn_vertiflip, *editbtn_horizflip;
+static LCUI_Widget *selected_mapobj_widget = NULL;
+
+/* 响应“删除”按钮的点击，删除地图对象 */
+static void 
+editbtn_del_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *unused )
+{
+	/* 设置当前选定的地图对象使用的图像ID为-1，也就是不用图像 */
+	MapBox_SetMapObj( mapbox, -1 );
+}
+
+/* 响应“垂直翻转”按钮的点击，对当前选定的地图块进行垂直翻转 */
+static void 
+editbtn_vertiflip_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *unused )
+{
+	MapBox_MapBlock_VertiFlip( mapbox );
+}
+
+/* 响应“水平翻转”按钮的点击，对当前选定的地图块/地图对象进行水平翻转 */
+static void 
+editbtn_horizflip_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *unused )
+{
+	/* 如果有已选定的地图对象部件 */
+	if( selected_mapobj_widget != NULL ) {
+		MapBox_MapObj_HorizFlip( mapbox );
+	} else {
+		MapBox_MapBlock_HorizFlip( mapbox );
+	}
+}
+
+/* 显示编辑按钮 */
+static void 
+editbtn_show( LCUI_Pos pos, LCUI_BOOL obj_is_mapobj )
+{
+	LCUI_Border border;
+	/* 如果是对象是地图对象，则显示地图对象的编辑按钮 */
+	if( obj_is_mapobj ) {
+		Widget_SetZIndex( editbtn_horizflip, 10000 );
+		Widget_SetZIndex( editbtn_del, 10000 );
+		Widget_Move( editbtn_del, pos );
+		pos.y += 27;
+		Widget_Move( editbtn_horizflip, pos );
+		Widget_Show( editbtn_del );
+		Widget_Show( editbtn_horizflip );
+		Widget_Hide( editbtn_vertiflip );
+		pos.y += 27;
+		/* 如果选定了地图对象，则设置边框，以突出显示 */
+		if( selected_mapobj_widget ) {
+			border = Border(2, BORDER_STYLE_SOLID, RGB(250,240,0));
+			Widget_SetBorder( selected_mapobj_widget, border );
+		}
+	} else { /* 否则显示地图块的编辑按钮 */
+		Widget_SetZIndex( editbtn_horizflip, 10000 );
+		Widget_SetZIndex( editbtn_vertiflip, 10000 );
+		Widget_Move( editbtn_horizflip, pos );
+		pos.y += 27;
+		Widget_Move( editbtn_vertiflip, pos );
+		Widget_Show( editbtn_horizflip );
+		Widget_Show( editbtn_vertiflip );
+		Widget_Hide( editbtn_del );
+		/* 如果之前选定过地图对象，则取消它的边框 */
+		if( selected_mapobj_widget ) {
+			border = Border( 0, BORDER_STYLE_SOLID, RGB(0,0,0) );
+			Widget_SetBorder( selected_mapobj_widget, border );
+			selected_mapobj_widget = NULL;
+		}
+	}
+}
+
+/* 隐藏编辑按钮 */
+static void editbtn_hide(void)
+{
+	LCUI_Border border;
+	Widget_Hide( editbtn_horizflip );
+	Widget_Hide( editbtn_vertiflip );
+	Widget_Hide( editbtn_del );
+	if( selected_mapobj_widget ) {
+		border = Border( 0, BORDER_STYLE_SOLID, RGB(0,0,0) );
+		Widget_SetBorder( selected_mapobj_widget, border );
+	}
+	selected_mapobj_widget = NULL;
+}
+
+/* 处理地图对象的点击 */
+static void proc_mapobj_clicked( LCUI_Widget *mapobj )
+{
+	LCUI_Pos pixel_pos;
+	LCUI_Size widget_size;
+	LCUI_Border border;
+	pixel_pos = Widget_GetPos( mapobj );
+	widget_size = Widget_GetSize( mapobj );
+	pixel_pos.x += (widget_size.w+2);
+	pixel_pos.y += (widget_size.h-2*27)/2;
+	if( selected_mapobj_widget ) {
+		border = Border( 0, BORDER_STYLE_SOLID, RGB(0,0,0) );
+		Widget_SetBorder( selected_mapobj_widget, border );
+	}
+	selected_mapobj_widget = mapobj;
+	editbtn_show( pixel_pos, TRUE );
+}
+
+/* 处理地图块的点击 */
+static void proc_mapblk_clicked( LCUI_Widget *widget )
+{
+	LCUI_Pos pixel_pos, tmp;
+	LCUI_Size blk_size;
+	
+	/* 如果有已选中的地图块 */
+	if( MapBox_GetSelected( widget, &tmp ) ) {
+		pixel_pos = MapBox_MapBlock_GetPixelPos( widget, tmp.y, tmp.x );
+		blk_size = MapBox_GetMapBlockSize( widget );
+		pixel_pos.x += blk_size.w;
+		pixel_pos.y += (blk_size.h-2*27)/2;
+		editbtn_show( pixel_pos, FALSE );
+	} else {
+		editbtn_hide();
+	}
+}
+
+/* 初始化编辑按钮 */
+static void editbtn_init(void)
+{
+	/* 创建按钮 */
+	editbtn_vertiflip = Widget_New("button");
+	editbtn_horizflip = Widget_New("button");
+	editbtn_del = Widget_New("button");
+	/* 将按钮添加至MapBox部件里 */
+	Widget_Container_Add( mapbox, editbtn_vertiflip );
+	Widget_Container_Add( mapbox, editbtn_horizflip );
+	Widget_Container_Add( mapbox, editbtn_del );
+	/* 设置按钮不自动改变尺寸 */
+	Widget_SetAutoSize( editbtn_vertiflip, FALSE, 0 );
+	Widget_SetAutoSize( editbtn_horizflip, FALSE, 0 );
+	Widget_SetAutoSize( editbtn_del, FALSE, 0 );
+	/* 设置按钮尺寸 */
+	Widget_Resize( editbtn_vertiflip, Size(27,27) );
+	Widget_Resize( editbtn_horizflip, Size(27,27) );
+	Widget_Resize( editbtn_del, Size(27,27) );
+	/* 设置按钮的背景图以及布局 */
+	Widget_SetBackgroundImage( editbtn_vertiflip, &img_btn_vertiflip );
+	Widget_SetBackgroundImage( editbtn_horizflip, &img_btn_horizflip );
+	Widget_SetBackgroundImage( editbtn_del, &img_btn_del );
+	Widget_SetBackgroundLayout( editbtn_vertiflip, LAYOUT_CENTER );
+	Widget_SetBackgroundLayout( editbtn_horizflip, LAYOUT_CENTER );
+	Widget_SetBackgroundLayout( editbtn_del, LAYOUT_CENTER );
+	/* 为按钮关联相应事件 */
+	Widget_Event_Connect( editbtn_vertiflip, EVENT_CLICKED, editbtn_vertiflip_clicked );
+	Widget_Event_Connect( editbtn_horizflip, EVENT_CLICKED, editbtn_horizflip_clicked );
+	Widget_Event_Connect( editbtn_del, EVENT_CLICKED, editbtn_del_clicked );
+	
+	MapBox_ConnectMapBlockClicked( mapbox, proc_mapblk_clicked );
+	MapBox_ConnectMapObjClicked( mapbox, proc_mapobj_clicked );
+}
+/* --------------------------------------------------------------------------------------*/
+
+/* 处理地图块按钮的点击 */
 static void
 proc_mapbtn_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 {
@@ -127,7 +292,7 @@ proc_mapbtn_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 	MapBox_SetCurrentMapBlock( mapbox, -1 );
 }
 
-
+/* 处理地图对象按钮的点击 */
 static void
 proc_objbtn_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 {
@@ -151,6 +316,7 @@ mapbox_proc_mousebutton( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 	}
 	MapBox_SetCurrentMapBlock( mapbox, -1 );
 	MapBox_SetCurrentMapObj( mapbox, -1 );
+	editbtn_hide();
 }
 
 /* 更新地图位置 */
@@ -269,8 +435,8 @@ static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *even
 	Widget_Move( label_oldsize, Pos(4,6) );
 	Widget_Move( label_newsize, Pos(4,29) );
 	Widget_Move( tb_cols, Pos(40+22,27) );
-	Widget_Move( tb_rows, Pos(80+22,27) );
-	Widget_Move( label_x, Pos(80+13,27) );
+	Widget_Move( tb_rows, Pos(73+22,27) );
+	Widget_Move( label_x, Pos(73+13,27) );
 	Widget_Move( label_pos, Pos(4,52) );
 	Widget_Move( posbox, Pos(35,73) );
 
@@ -278,8 +444,8 @@ static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *even
 	Widget_SetAlign( btn_cancel, ALIGN_BOTTOM_CENTER, Pos(26,-5) );
 	Widget_Hide( Window_GetCloseButton(wnd) );
 	/* 调整按钮的尺寸 */
-	Widget_Resize( tb_rows, Size(28,22) );
-	Widget_Resize( tb_cols, Size(28,22) );
+	Widget_Resize( tb_rows, Size(21,22) );
+	Widget_Resize( tb_cols, Size(21,22) );
 	Widget_Resize( btn_ok, Size(50,25) );
 	Widget_Resize( btn_cancel, Size(50,25) );
 	Widget_Resize( wnd, Size(155,215) );
@@ -288,9 +454,9 @@ static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *even
 	/* 限制这两个文本框只能被输入数字 */
 	TextBox_LimitInput( tb_rows, L"0123456789" );
 	TextBox_LimitInput( tb_cols, L"0123456789" );
-	/* 限制文本框最多输入3位数 */
-	TextBox_Text_SetMaxLength( tb_rows, 3 );
-	TextBox_Text_SetMaxLength( tb_cols, 3 );
+	/* 限制文本框最多输入2位数 */
+	TextBox_Text_SetMaxLength( tb_rows, 2 );
+	TextBox_Text_SetMaxLength( tb_cols, 2 );
 
 	map_size = MapBox_GetMapSize( mapbox );
 	
@@ -334,18 +500,6 @@ static void proc_btn_resize_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *even
 	}
 	Widget_Hide( wnd );
 	Widget_Destroy( wnd );
-}
-
-static void 
-proc_btn_vertiflip_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
-{
-	MapBox_MapBlock_VertiFlip( mapbox );
-}
-
-static void 
-proc_btn_horizflip_clicked( LCUI_Widget *widget, LCUI_WidgetEvent *event )
-{
-	MapBox_MapBlock_HorizFlip( mapbox );
 }
 
 /* 初始化地图对象窗口 */
@@ -538,47 +692,29 @@ static void mapbox_init(void)
 static void titebar_btn_init(void)
 {
 	/* 创建按钮 */
-	btn_vertiflip = Widget_New("button");
-	btn_horizflip = Widget_New("button");
 	btn_save = Widget_New("button");
 	btn_resize = Widget_New("button");
 	/* 添加按钮 */
-	Window_TitleBar_Add( window, btn_vertiflip );
-	Window_TitleBar_Add( window, btn_horizflip );
 	Window_TitleBar_Add( window, btn_resize );
 	Window_TitleBar_Add( window, btn_save );
 	/* 设置按钮不自动改变尺寸 */
-	Widget_SetAutoSize( btn_vertiflip, FALSE, 0 );
-	Widget_SetAutoSize( btn_horizflip, FALSE, 0 );
 	Widget_SetAutoSize( btn_resize, FALSE, 0 );
 	Widget_SetAutoSize( btn_save, FALSE, 0 );
 	/* 设置按钮尺寸 */
-	Widget_Resize( btn_vertiflip, Size(27,27) );
-	Widget_Resize( btn_horizflip, Size(27,27) );
 	Widget_Resize( btn_save, Size(27,27) );
 	Widget_Resize( btn_resize, Size(27,27) );
 	/* 设置按钮的背景图以及布局 */
-	Widget_SetBackgroundImage( btn_vertiflip, &img_btn_vertiflip );
-	Widget_SetBackgroundImage( btn_horizflip, &img_btn_horizflip );
 	Widget_SetBackgroundImage( btn_save, &img_btn_save );
 	Widget_SetBackgroundImage( btn_resize, &img_btn_resize );
-	Widget_SetBackgroundLayout( btn_vertiflip, LAYOUT_CENTER );
-	Widget_SetBackgroundLayout( btn_horizflip, LAYOUT_CENTER );
 	Widget_SetBackgroundLayout( btn_save, LAYOUT_CENTER );
 	Widget_SetBackgroundLayout( btn_resize, LAYOUT_CENTER );
 	/* 设置按钮的位置 */
-	Widget_SetAlign( btn_vertiflip, ALIGN_BOTTOM_RIGHT, Pos(-50,0) );
-	Widget_SetAlign( btn_horizflip, ALIGN_BOTTOM_RIGHT, Pos(-(50+27),0) );
-	Widget_SetAlign( btn_resize, ALIGN_BOTTOM_RIGHT, Pos(-(50+2*27),0) );
-	Widget_SetAlign( btn_save, ALIGN_BOTTOM_RIGHT, Pos(-(50+3*27),0) );
+	Widget_SetAlign( btn_resize, ALIGN_BOTTOM_RIGHT, Pos(-50,0) );
+	Widget_SetAlign( btn_save, ALIGN_BOTTOM_RIGHT, Pos(-(50+27),0) );
 	/* 为按钮关联相应事件 */
-	Widget_Event_Connect( btn_vertiflip, EVENT_CLICKED, proc_btn_vertiflip_clicked );
-	Widget_Event_Connect( btn_horizflip, EVENT_CLICKED, proc_btn_horizflip_clicked );
 	Widget_Event_Connect( btn_resize, EVENT_CLICKED, proc_btn_resize_clicked );
 	Widget_Event_Connect( btn_save, EVENT_CLICKED, proc_btn_save );
 	/* 显示它们 */
-	Widget_Show( btn_vertiflip );
-	Widget_Show( btn_horizflip );
 	Widget_Show( btn_save );
 	Widget_Show( btn_resize );
 }
@@ -588,7 +724,7 @@ int LCUIMainFunc( LCUI_ARGLIST )
 #ifdef LCUI_BUILD_IN_WIN32
 	InitConsoleWindow();
 #endif
-	setenv( "LCUI_FONTFILE", "/usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-R.ttf", FALSE );
+	//setenv( "LCUI_FONTFILE", "/usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-R.ttf", FALSE );
 	LCUI_Init(LCUI_DEFAULT_CONFIG);
 	load_res();
 	window_init();
@@ -597,6 +733,7 @@ int LCUIMainFunc( LCUI_ARGLIST )
 	mapobjbox_init();
 	titebar_btn_init();
 	mapbox_init();
+	editbtn_init();
 	LCUIApp_AtQuit( free_res );
 	return LCUI_Main();
 }

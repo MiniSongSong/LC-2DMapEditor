@@ -722,7 +722,7 @@ static void titebar_btn_init(void)
 int LCUIMainFunc( LCUI_ARGLIST )
 {
 #ifdef LCUI_BUILD_IN_WIN32
-	InitConsoleWindow();
+	//InitConsoleWindow();
 #endif
 	//setenv( "LCUI_FONTFILE", "/usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-R.ttf", FALSE );
 	LCUI_Init(LCUI_DEFAULT_CONFIG);

@@ -338,8 +338,8 @@ static int MapBox_RedrawMapObj( LCUI_Widget *widget, int row, int col )
 	pos.x += offset.x;
 	pos.y += offset.y;
 	Widget_Move( obj_widget, pos );
-	/* 根据坐标来计算部件的z-index值 */
-	n = mapbox->rows * mapbox->cols + col;
+	/* 根据地图块坐标来计算部件的z-index值 */
+	n = row * mapbox->cols + col;
 	/* 设置部件的堆叠顺序 */
 	Widget_SetZIndex( obj_widget, n );
 	Widget_Show( obj_widget );
@@ -986,10 +986,7 @@ static void
 MapBox_ProcMouseMotionEvent( LCUI_Widget *widget, LCUI_WidgetEvent *event )
 {
 	LCUI_Pos pos;
-
-	DEBUG_MSG("relative pixel pos: %d, %d\n", pos.x, pos.y);
 	pos = MapBox_MapBlock_GetPos( widget, event->mouse_motion.rel_pos );
-	DEBUG_MSG("mapblock pos: %d, %d\n", pos.x, pos.y);
 	/* 高亮指定地图块 */
 	MapBox_HiglightMapBlock( widget, pos );
 }

@@ -1,4 +1,4 @@
-#ifndef __POSBOX__
+ï»¿#ifndef __POSBOX__
 #define __POSBOX__
 
 typedef enum POSBOX_POS_ {
@@ -13,10 +13,10 @@ typedef enum POSBOX_POS_ {
 	POS_BOTTOMRIGHT
 } POSBOX_POS;
 
-/* »ñÈ¡PosBox²¿¼şÖĞ¼ÇÂ¼µÄ¶¨Î» */
+/* è·å–PosBoxéƒ¨ä»¶ä¸­è®°å½•çš„å®šä½ */
 POSBOX_POS PosBox_GetPos( LCUI_Widget *widget );
 
-/* ×¢²áPosBox²¿¼ş */
+/* æ³¨å†ŒPosBoxéƒ¨ä»¶ */
 void Register_PosBox(void);
 
 #endif

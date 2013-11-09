@@ -161,8 +161,7 @@ static void PosBox_ExecInit( LCUI_Widget *widget )
 		{IMG_BOTTOMLEFT, IMG_BOTTOMCENTER, IMG_BOTTOMRIGHT}
 	};
 
-	posbox = (PosBox_Data *)WidgetPrivData_New
-			(widget, sizeof(PosBox_Data)); 
+	posbox = (PosBox_Data *)Widget_NewPrivData(widget, sizeof(PosBox_Data)); 
 	
 	posbox->pos = 4;
 	pos.x = pos.y = 0;
@@ -175,7 +174,7 @@ static void PosBox_ExecInit( LCUI_Widget *widget )
 			Widget_Container_Add( widget, posbox->btn[i][j] );
 			Widget_Move( posbox->btn[i][j], pos );
 			Graph_Init( &posbox->img[i][j] );
-			Load_Image( imgfile[i][j], &posbox->img[i][j] );
+			Graph_LoadImage( imgfile[i][j], &posbox->img[i][j] );
 			Widget_SetBackgroundImage( posbox->btn[i][j], &posbox->img[i][j] );
 			Widget_SetBackgroundLayout( posbox->btn[i][j], LAYOUT_CENTER );
 			Widget_Event_Connect( posbox->btn[i][j], EVENT_CLICKED, func[i][j] );

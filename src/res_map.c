@@ -1,8 +1,8 @@
-#include <LCUI_Build.h>
+﻿#include <LCUI_Build.h>
 #include LC_LCUI_H
 #include LC_GRAPH_H
 
-int load_red_border ( LCUI_Graph *buff )
+int load_red_border( LCUI_Graph *buff )
 {
 	int ret;
 	unsigned char alpha[] = {
@@ -99,17 +99,13 @@ int load_red_border ( LCUI_Graph *buff )
 		Graph_Free( buff );
 	}
 	Graph_Init( buff );
-	buff->have_alpha = TRUE;
-	buff->alpha = 255;
-	buff->type = 1;
+	buff->color_type = COLOR_TYPE_RGBA;
 	ret = Graph_Create( buff, 44, 22 );
 	if( ret == 0 ) {
 		memset( buff->rgba[0], 255, sizeof(alpha) );
 		memset( buff->rgba[1], 0, sizeof(alpha) );
 		memset( buff->rgba[2], 0, sizeof(alpha) );
-		if( buff->have_alpha ) {
-			memcpy( buff->rgba[3], alpha, sizeof(alpha) );
-		}
+		memcpy( buff->rgba[3], alpha, sizeof(alpha) );
 	}
 	return ret;
 }

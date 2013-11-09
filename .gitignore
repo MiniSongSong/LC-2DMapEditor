@@ -6,7 +6,6 @@
 *.a
 
 # Shared objects (inc. Windows DLLs)
-*.dll
 *.so
 *.so.*
 *.dylib
@@ -16,18 +15,21 @@
 *.out
 *.app
 
+# Other
 .directory
 *.lo
 .deps
 .libs
 *.la
+*.sdf
 Makefile
 autom4te.cache
-lcui.pc
 libtool
 config.log
 config.status
 stamp-h1
 mapedit
 Thumbs.db
-
+bin/Release
+bin/Debug
+bin/LCUI-2DmapEditor.pdb
